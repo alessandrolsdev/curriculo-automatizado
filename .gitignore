@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Variáveis de Ambiente (Chaves de API)
+.env
+
+# Logs e Outputs (Não versionamos arquivos gerados)
+logs/
+output/
+*.log
+*.pdf
+*.docx
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db

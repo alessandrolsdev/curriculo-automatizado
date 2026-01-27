@@ -1,0 +1,183 @@
+{
+  "profile": {
+    "name": "Alessandro Lima da Silva",
+    "email": "alessandrolsdev@gmail.com",
+    "phone": "(67) 99171-0135",
+    "location": "Campo Grande - MS, Brasil",
+    "linkedin": "https://www.linkedin.com/in/alessandrolsdev",
+    "github": "https://github.com/alessandrolsdev",
+    "portfolio_site": "https://alessandrolsdev.github.io",
+    "summaries": {
+      "frontend": "Engenheiro de Software em formação focado no ecossistema React e UI/UX. Experiência prática na construção de SPAs, PWAs Offline-First e Design Systems, com forte disciplina em Clean Code.",
+      "backend": "Engenheiro de Software com foco em arquiteturas escaláveis, APIs RESTful de alta performance e microsserviços. Especialista em Node.js e Python (FastAPI), com domínio em modelagem de dados (SQL/NoSQL) e integração de IA.",
+      "rpa": "Desenvolvedor Python focado em Automação de Processos (RPA) e APIs. Premiado por inovação, com perfil resolutivo para criar robôs que alavancam a eficiência operacional usando Selenium, Pandas e IA.",
+      "fullstack": "Desenvolvedor Full Stack versátil (React + Python/Node). Experiência em modernização de legado, arquitetura orientada a eventos e desenvolvimento de soluções completas do banco de dados ao frontend.",
+      "english": "Final-year Software Engineering student with a strong background in Web Performance and Automation. Specialized in building high-conversion applications and integrating them with AI and CRM pipelines."
+    }
+  },
+  "education": [
+    {
+      "institution": "Universidade Estácio de Sá",
+      "degree": "Bacharel em Engenharia de Software",
+      "period": "Mar/2022 - Mar/2026 (Previsão)",
+      "status": "Em andamento"
+    }
+  ],
+  "languages": [
+    {
+      "language": "Português",
+      "level": "Nativo"
+    },
+    {
+      "language": "Inglês",
+      "level": "Intermediário (Leitura Técnica / Technical Reading)"
+    }
+  ],
+  "experience": [
+    {
+      "company": "Aegea Saneamento",
+      "role": "Estagiário de Tecnologia da Informação",
+      "period": "Set 2022 - Set 2025",
+      "location": "Campo Grande, MS",
+      "description_bullets": [
+        {
+          "text": "Gerenciamento e configuração de ativos corporativos utilizando Microsoft Azure, garantindo segurança e compliance.",
+          "tags": ["infra", "support", "general"]
+        },
+        {
+          "text": "Suporte na resolução de falhas de rede e sistemas em ambiente de grande escala, assegurando estabilidade operacional.",
+          "tags": ["support", "infra"]
+        },
+        {
+          "text": "Atuação com metodologias ágeis no atendimento a chamados técnicos e documentação de soluções.",
+          "tags": ["agile", "documentation"]
+        },
+        {
+          "text_en": "Managed and configured corporate devices using Microsoft Azure, gaining hands-on cloud platform experience.",
+          "tags": ["infra", "english"]
+        }
+      ]
+    }
+  ],
+  "skills": {
+    "frontend": ["React.js", "Next.js", "TypeScript", "Vue.js", "Tailwind CSS", "Framer Motion", "Redux/Context API", "Micro-frontends"],
+    "backend": ["Python", "Node.js", "FastAPI", "NestJS", "Express", "GraphQL", "REST APIs", "C# / .NET Fundamentals"],
+    "database": ["PostgreSQL", "SQLAlchemy", "Prisma ORM", "Redis", "MongoDB"],
+    "rpa_ai": ["Selenium", "BeautifulSoup", "Pandas", "BotCity", "OpenAI API", "Google Gemini API", "LangChain", "AsyncIO"],
+    "devops": ["Docker", "Git/GitHub Actions", "CI/CD", "Vercel", "Azure Basics", "Linux"]
+  },
+  "projects": [
+    {
+      "id": "nomad_system",
+      "title": "NOMAD Financial System (PWA)",
+      "tech_stack": ["React", "Python", "FastAPI", "PostgreSQL", "Service Workers"],
+      "type": "Fullstack",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Engenharia de uma Fintech PWA Offline-First. Implementação de Service Workers e filas de sincronização no LocalStorage para garantir integridade de dados sem internet."
+        },
+        {
+          "focus": "backend",
+          "text": "Backend performático com Python (FastAPI) e SQLAlchemy. Validação rigorosa com Pydantic e otimização de queries SQL (Eager Loading)."
+        },
+        {
+          "focus": "english",
+          "text": "Engineered a robust Fintech application using decoupled architecture. Developed an Offline-First experience using synchronization queues."
+        }
+      ]
+    },
+    {
+      "id": "clutch_assistant",
+      "title": "Clutch Assistant (AI Automation Agent)",
+      "tech_stack": ["Python", "AsyncIO", "Google Gemini API", "SQL", "Docker"],
+      "type": "AI/Backend",
+      "descriptions": [
+        {
+          "focus": "backend",
+          "text": "Sistema modular com Python e AsyncIO para processamento de áudio e comandos em tempo real. Solução de desafios de concorrência e latência de rede (UDP)."
+        },
+        {
+          "focus": "ai",
+          "text": "Integração de IA Generativa (Gemini) para processamento de linguagem natural (NLP) e execução de automações baseadas em contexto."
+        },
+        {
+          "focus": "english",
+          "text": "Engineered a modular AI agent using Python and AsyncIO for real-time audio processing and context-aware NLP interactions."
+        }
+      ]
+    },
+    {
+      "id": "gamified_platform",
+      "title": "Plataforma de Produtividade Gamificada",
+      "tech_stack": ["NestJS", "GraphQL", "Redis", "BullMQ", "React 18"],
+      "type": "Backend",
+      "descriptions": [
+        {
+          "focus": "backend",
+          "text": "Arquitetura orientada a eventos usando NestJS e Apollo Server. Implementação de background jobs (cálculo de XP) com Redis e BullMQ para alta performance."
+        }
+      ]
+    },
+    {
+      "id": "boleto_bot",
+      "title": "Bot de Extração de Dados Financeiros",
+      "tech_stack": ["Python", "Pandas", "RegEx", "RPA"],
+      "type": "RPA",
+      "descriptions": [
+        {
+          "focus": "rpa",
+          "text": "Desenvolvimento de robô para leitura, extração e estruturação de dados de boletos bancários padronizados, eliminando trabalho manual repetitivo."
+        }
+      ]
+    },
+    {
+      "id": "advocacia_lp",
+      "title": "Landing Page: Advocacia Estratégica",
+      "tech_stack": ["Vue.js 3", "TypeScript", "Vite", "Tailwind"],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Interface de alta conversão com Vue.js 3 (Composition API). Animações reativas e otimização mobile-first focada em Core Web Vitals."
+        }
+      ]
+    },
+    {
+      "id": "cyberpunk_hub",
+      "title": "Interactive Cyberpunk Hub",
+      "tech_stack": ["React", "Framer Motion", "HTML5 Canvas"],
+      "type": "Frontend/Creative",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "SPA com foco em micro-interações e animações fluidas. Otimização de renderização gráfica (Matrix Rain) fora da thread principal para garantir 60fps."
+        }
+      ]
+    },
+    {
+      "id": "linktree_clone",
+      "title": "Digital Bio Platform (Linktree)",
+      "tech_stack": ["Next.js 14", "Server Components", "Edge Caching"],
+      "type": "Fullstack",
+      "descriptions": [
+        {
+          "focus": "fullstack",
+          "text": "Plataforma de agregação de links otimizada para Core Web Vitals. Consumo de múltiplas APIs externas com estratégias de Edge Caching na Vercel."
+        }
+      ]
+    },
+    {
+      "id": "pokedex",
+      "title": "Pokédex Interativa",
+      "tech_stack": ["JavaScript ES6", "Webpack 5", "PokéAPI"],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Aplicação modular com sistema de build otimizado via Webpack 5. Gestão de estado com Vanilla JS e persistência local."
+        }
+      ]
+    }
+  ]
+}
