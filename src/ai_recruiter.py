@@ -1,35 +1,74 @@
+"""
+Módulo AI Recruiter
+===================
+
+Este módulo gerencia a interação com a Google Gemini AI para análise de vagas
+e geração de currículos otimizados.
+
+Responsabilidades:
+    - Carregar dados mestre (Master Data).
+    - Decidir a melhor estratégia de currículo baseada na descrição da vaga.
+    - Construir o contexto para renderização do template DOCX.
+"""
+
 import os
 import json
 from datetime import datetime
+from typing import Dict, List, Any, Union
+
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from docxtpl import DocxTemplate
 
-# Carrega as variáveis do .env (API Key)
+# Carrega variáveis de ambiente
 load_dotenv()
 
-# Configurações de Caminhos
+# --- Configurações e Constantes ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(BASE_DIR, "data", "master_data.json")
 TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "base_template.docx")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
 
-def load_data():
+def load_data() -> Dict[str, Any]:
+    """
+    Carrega o arquivo JSON contendo os dados mestre do candidato.
+
+    Returns:
+        Dict[str, Any]: Dicionário com os dados carregados do arquivo master_data.json.
+
+    Raises:
+        FileNotFoundError: Se o arquivo não for encontrado.
+        json.JSONDecodeError: Se o arquivo não for um JSON válido.
+    """
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def get_ai_decision(job_description, master_data):
+def get_ai_decision(
+    job_description: str, master_data: Dict[str, Any]
+) -> Dict[str, Any]:
     """
-    Envia a vaga para o Gemini com estratégia de Fallback Inteligente.
-    Adapta a 'temperatura' conforme a geração do modelo (Gemini 3 vs 2.5).
+    Analisa a descrição da vaga utilizando IA (Gemini) para selecionar
+    os projetos, skills e resumo mais adequados.
+
+    Implementa estratégia de fallback tentando diferentes modelos em ordem de capacidade.
+
+    Args:
+        job_description (str): Texto completo da descrição da vaga.
+        master_data (Dict[str, Any]): Dados mestre do candidato.
+
+    Returns:
+        Dict[str, Any]: Dicionário contendo a decisão da IA com as seguintes chaves:
+            - selected_summary_key (str): Chave do resumo escolhido (ex: 'backend').
+            - selected_project_ids (List[str]): Lista de IDs dos projetos selecionados.
+            - skills_order (List[str]): Lista ordenada de categorias de skills.
+
+    Raises:
+        Exception: Se todos os modelos falharem na análise.
     """
-    # Ordem de tentativa baseada na sua documentação:
-    # 1. Gemini 3 Pro (A Ferrari do Raciocínio)
-    # 2. Gemini 3 Flash (Inteligente e Rápido)
-    # 3. Gemini 2.5 Flash (O Backup Estável que sabemos que funciona)
+    # Ordem de prioridade dos modelos
     models_to_try = [
         "gemini-3-pro-preview",
         "gemini-3-flash-preview",
@@ -41,25 +80,26 @@ def get_ai_decision(job_description, master_data):
         for p in master_data["projects"]
     ]
 
+    # Template do Prompt
     template = """
     Você é um Tech Recruiter Sênior e Especialista em ATS.
     
-    SUA MISSÃO:
-    Analise a DESCRIÇÃO DA VAGA abaixo e selecione os melhores dados do candidato.
+    OBJETIVO:
+    Analise a DESCRIÇÃO DA VAGA abaixo e selecione os dados mais relevantes do candidato para otimizar o currículo.
     
-    DADOS:
-    - Resumos: {summary_keys}
+    DADOS DO CANDIDATO:
+    - Perfis Disponíveis: {summary_keys}
     - Projetos: {projects_json}
-    - Skills: {skills_keys}
+    - Categorias de Skills: {skills_keys}
     
-    VAGA:
+    DESCRIÇÃO DA VAGA:
     "{job_description}"
     
-    SAÍDA (JSON Puro):
+    OUTPUT ESPERADO (JSON):
     {{
-        "selected_summary_key": "ex: backend",
-        "selected_project_ids": ["id1", "id2", "id3"],
-        "skills_order": ["cat1", "cat2"]
+        "selected_summary_key": "string (ex: backend, fullstack)",
+        "selected_project_ids": ["string", "string", ...],
+        "skills_order": ["string", "string", ...]
     }}
     """
 
@@ -74,12 +114,12 @@ def get_ai_decision(job_description, master_data):
     )
 
     for model_name in models_to_try:
-        print(f"🤖 Tentando analisar com: {model_name.upper()}...")
+        print(f"🤖 Tentando análise com: {model_name}...")
 
         try:
-            # AJUSTE FINO DA DOCUMENTAÇÃO:
-            # Gemini 3 exige temperatura padrão (1.0) para raciocinar bem.
-            # Gemini 2.5 funciona melhor com temperatura baixa (0.2) para tarefas de extração.
+            # Ajuste de temperatura conforme modelo
+            # Modelos mais 'raciocinadores' (Pro) funcionam bem com temp padrão.
+            # Modelos menores (Flash) podem precisar de menor temperatura para consistência JSON.
             current_temp = 1.0 if "gemini-3" in model_name else 0.2
 
             llm = ChatGoogleGenerativeAI(model=model_name, temperature=current_temp)
@@ -94,53 +134,66 @@ def get_ai_decision(job_description, master_data):
                 }
             )
 
-            # Limpeza do JSON (às vezes a IA manda ```json no começo)
+            # Limpeza do Markdown JSON, se presente
             json_str = (
                 response.content.replace("```json", "").replace("```", "").strip()
             )
 
-            print(f"✅ SUCESSO! Currículo gerado pelo {model_name.upper()}!")
+            print(f"✅ Análise concluída com sucesso via {model_name}!")
             return json.loads(json_str)
 
         except Exception as e:
             error_message = str(e)
+            reason = "Erro desconhecido"
             if "404" in error_message:
-                reason = "Modelo não liberado/encontrado"
+                reason = "Modelo não encontrado/disponível"
             elif "429" in error_message:
-                reason = "Sem cota gratuita (Limit Exceeded)"
-            else:
-                reason = "Erro desconhecido"
+                reason = "Limite de requisições excedido"
 
-            # Loga o erro curto e tenta o próximo da lista
-            print(f"⚠️  Falha no {model_name}. Motivo: {reason}...")
+            print(f"⚠️ Falha no modelo {model_name}: {reason}")
             continue
 
-    raise Exception("❌ Todos os modelos falharam. Verifique sua API Key.")
+    raise Exception("Falha crítica: Todos os modelos disponíveis falharam na análise.")
 
 
-def build_context_from_decision(decision, data):
+def build_context_from_decision(
+    decision: Dict[str, Any], data: Dict[str, Any]
+) -> Dict[str, Any]:
     """
-    Reconstrói o dicionário que o DocxTemplate precisa, baseado na decisão da IA.
+    Constrói o contexto final para o template Jinja2 (DocxTemplate) baseado na decisão da IA.
+
+    Args:
+        decision (Dict[str, Any]): Saída da função get_ai_decision.
+        data (Dict[str, Any]): Dados mestre.
+
+    Returns:
+        Dict[str, Any]: Contexto pronto para renderização.
     """
     context = {}
 
-    # 1. Dados Pessoais e Educação (Fixos)
-    context["name"] = data["profile"]["name"]
-    context["location"] = data["profile"]["location"]
-    context["phone"] = data["profile"]["phone"]
-    context["email"] = data["profile"]["email"]
-    context["linkedin"] = data["profile"]["linkedin"]
-    context["github"] = data["profile"]["github"]
-    context["education"] = data["education"]
-
-    # 2. Resumo Escolhido pela IA
-    key = decision["selected_summary_key"]
-    context["role_title"] = f"Desenvolvedor {key.title()}"
-    context["summary"] = data["profile"]["summaries"].get(
-        key, data["profile"]["summaries"]["fullstack"]
+    # 1. Dados Pessoais (Fixos)
+    profile = data["profile"]
+    context.update(
+        {
+            "name": profile["name"],
+            "location": profile["location"],
+            "phone": profile["phone"],
+            "email": profile["email"],
+            "linkedin": profile["linkedin"],
+            "github": profile["github"],
+            "education": data["education"],
+        }
     )
 
-    # 3. Skills Reordenadas pela IA
+    # 2. Resumo Profissional
+    key = decision["selected_summary_key"]
+    # Fallback para 'fullstack' se a chave alucinada não existir
+    context["role_title"] = f"Desenvolvedor {key.title()}"
+    context["summary"] = profile["summaries"].get(
+        key, profile["summaries"]["fullstack"]
+    )
+
+    # 3. Skills (Ordenadas pela IA)
     context["skills"] = []
     for skill_key in decision["skills_order"]:
         if skill_key in data["skills"]:
@@ -151,25 +204,23 @@ def build_context_from_decision(decision, data):
                 }
             )
 
-    # 4. Projetos Selecionados pela IA
+    # 4. Projetos Selecionados
     context["selected_projects"] = []
-    target_role = decision[
-        "selected_summary_key"
-    ]  # Usa o papel para escolher a descrição do projeto
+    target_role = key  # Usa o perfil escolhido para filtrar descrições do projeto
 
     for proj_id in decision["selected_project_ids"]:
-        # Busca o projeto completo no master_data pelo ID
         project = next((p for p in data["projects"] if p["id"] == proj_id), None)
 
         if project:
-            # Tenta pegar a descrição focada na vaga (ex: descrição 'backend' para vaga backend)
-            # Se não tiver, pega a primeira disponível
+            # Seleciona a descrição mais adequada ao perfil
             desc_text = ""
             for desc in project["descriptions"]:
                 if desc["focus"] == target_role:
                     desc_text = desc["text"]
                     break
-            if not desc_text:
+
+            # Fallback para a primeira descrição
+            if not desc_text and project["descriptions"]:
                 desc_text = project["descriptions"][0]["text"]
 
             context["selected_projects"].append(
@@ -180,11 +231,13 @@ def build_context_from_decision(decision, data):
                 }
             )
 
-    # 5. Experiência (Mantemos a mais recente, filtrada por tags se quiser avançar depois)
+    # 5. Experiência Profissional
+    # Lógica atual: Pega apenas a mais recente.
+    # TODO: Expandir para selecionar experiências baseadas na relevância.
     latest_job = data["experience"][0]
-    # Filtro simples: Se a vaga é inglês, pega bullets em inglês
+
     bullets = []
-    is_english = target_role == "english"
+    is_english = target_role == "english" or "english" in target_role.lower()
 
     for b in latest_job["description_bullets"]:
         if is_english and "text_en" in b:
@@ -196,48 +249,46 @@ def build_context_from_decision(decision, data):
         "role": latest_job["role"],
         "company": latest_job["company"],
         "period": latest_job["period"],
-        "bullets": bullets[:5],  # Top 5 bullets
+        "bullets": bullets[:5],  # Limita as top 5 bullets
     }
 
     return context
 
 
 if __name__ == "__main__":
-    # --- ÁREA DE TESTE (Konrad - Entry Level Software Developer) ---
-    vaga_teste = """
-    Who We Are
-    Konrad is a next generation digital consultancy. We are dedicated to solving complex business problems for our global clients with creative and forward-thinking solutions. Our employees enjoy a culture built on innovation and a commitment to creating best-in-class digital products in use by hundreds of millions of consumers around the world. We hire exceptionally smart, analytical, and hard working people who are lifelong learners.
+    # --- Exemplo de Uso (Teste Isolado) ---
+    print("--- Iniciando Teste Isolado do Recrutador IA ---")
 
-    About The Role
-    As an entry level Software Developer you'll be tasked with working on both mobile and web applications. Working within the software development team, your duties will require you to assist in the development of consumer and enterprise applications. This role is ideal for entry level developers who feel confident in their technical ability and want to be a part of the highly-skilled development team at Konrad.
-
-    What You'll Do
-    Write maintainable, testable, and performant software in collaboration with our world class team 
-    Participate in code review and performing extensive testing to ensure high quality software 
-    Research new technology and tools and share those findings with the team
-    Communicate clearly and effectively with all members of our team
-
-    Qualifications (Implied from text above: Mobile/Web, Testing, Code Review)
-
-    The estimated compensation for this position is $85,000 to $95,000.
+    # Exemplo de Vaga
+    VAGA_TESTE = """
+    Vaga: Python Backend Developer
+    Requisitos: Experiência com APIs REST, Django/FastAPI, Docker e Cloud AWS.
+    Desejável: Conhecimento em IA e LLMs.
     """
 
-    data = load_data()
+    try:
+        master_data = load_data()
 
-    # 1. IA decide
-    decision = get_ai_decision(vaga_teste, data)
-    print(f"🧠 Decisão da IA: {json.dumps(decision, indent=2)}")
+        # 1. Simula Decisão da IA
+        decision = get_ai_decision(VAGA_TESTE, master_data)
+        print(f"\n🧠 Decisão da IA:\n{json.dumps(decision, indent=2)}")
 
-    # 2. Python monta o contexto
-    final_context = build_context_from_decision(decision, data)
+        # 2. Constrói Contexto
+        final_context = build_context_from_decision(decision, master_data)
 
-    # 3. Docx gera o arquivo
-    doc = DocxTemplate(TEMPLATE_PATH)
-    doc.render(final_context)
+        # 3. Gera Arquivo
+        doc = DocxTemplate(TEMPLATE_PATH)
+        doc.render(final_context)
 
-    # Nome do arquivo com timestamp para não sobrescrever
-    filename = f"CV_Konrad_Developer_{datetime.now().strftime('%H%M%S')}.docx"
-    save_path = os.path.join(OUTPUT_DIR, filename)
+        timestamp = datetime.now().strftime("%H%M%S")
+        filename = f"CV_TESTE_{timestamp}.docx"
+        save_path = os.path.join(OUTPUT_DIR, filename)
 
-    doc.save(save_path)
-    print(f"🚀 Currículo gerado com sucesso: {save_path}")
+        # Garante que o diretório de saída existe
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+        doc.save(save_path)
+        print(f"\n🚀 Currículo de teste gerado: {save_path}")
+
+    except Exception as e:
+        print(f"\n❌ Erro durante o teste: {e}")
