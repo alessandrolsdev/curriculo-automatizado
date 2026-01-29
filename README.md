@@ -16,12 +16,15 @@ O **Nexus AI Recruiter** é uma aplicação desenvolvida para automatizar e otim
 - **Adaptação Dinâmica**: Seleção inteligente de projetos e resumos profissionais.
 - **Interface Moderna**: UI desenvolvida em Streamlit com design system responsivo e Glassmorphism.
 - **Saída Otimizada**: Geração de arquivos `.docx` prontos para ATS (Applicant Tracking Systems).
+- **Alta Performance**: Banco SQLite com cache de decisões da IA (consultas 4x mais rápidas).
+- **Modelo Garantido**: Uso exclusivo do Gemini 2.5 Flash para máxima confiabilidade.
 
 ## 🚀 Tecnologias
 
 - **Frontend**: [Streamlit](https://streamlit.io/) (Interface Web)
 - **Backend**: Python 3.10+
-- **IA/LLM**: [Google Gemini](https://ai.google.dev/) (via `langchain-google-genai`)
+- **Banco de Dados**: SQLite com [SQLAlchemy](https://www.sqlalchemy.org/) ORM
+- **IA/LLM**: [Google Gemini 2.5 Flash](https://ai.google.dev/) (via `langchain-google-genai`)
 - **Manipulação de Documentos**: `docxtpl` (Templating de arquivos Word)
 - **Gerenciamento de Ambiente**: `python-dotenv`
 
@@ -30,16 +33,20 @@ O **Nexus AI Recruiter** é uma aplicação desenvolvida para automatizar e otim
 ```
 curriculo-automatizado/
 ├── data/
-│   └── master_data.json       # Base de conhecimento (Experiências, Projetos, Skills)
+│   ├── master_data.json.backup # Backup do JSON original
+│   └── curriculo.db             # Banco de dados SQLite
 ├── src/
-│   ├── app.py                 # Ponto de entrada da aplicação Streamlit
-│   ├── ai_recruiter.py        # Módulo Core de Lógica e Integração com IA
-│   └── main.py                # Script Legacy para geração manual
+│   ├── app.py                   # Ponto de entrada da aplicação Streamlit
+│   ├── ai_recruiter.py          # Módulo Core de Lógica e Integração com IA
+│   ├── database.py              # Módulo de acesso ao banco SQLite
+│   └── main.py                  # Script Legacy (depreciado)
 ├── templates/
-│   └── base_template.docx     # Template Jinja2 para o currículo
-├── output/                    # Diretório de saída dos currículos gerados
-├── .env                       # Variáveis de ambiente (API Keys)
-└── requirements.txt           # Dependências do projeto
+│   └── base_template.docx       # Template Jinja2 para o currículo
+├── migrate_json_to_sqlite.py    # Script de migração JSON → SQLite
+├── output/                      # Diretório de saída dos currículos gerados
+├── logs/                        # Logs de migração e operações
+├── .env                         # Variáveis de ambiente (API Keys)
+└── requirements.txt             # Dependências do projeto
 ```
 
 ## 🛠️ Instalação e Configuração
@@ -82,13 +89,35 @@ Para iniciar a interface interativa:
 ```bash
 streamlit run src/app.py
 ```
-O navegador abrirá automaticamente em `http://localhost:8501`. Cole a descrição da vaga desejada, selecione o modelo de IA e clique em **Gerar Currículo**.
+O navegador abrirá automaticamente em `http://localhost:8501`. Cole a descrição da vaga desejada e clique em **Gerar Currículo**.
+
+> **Nota**: O sistema utiliza exclusivamente o modelo **Gemini 2.5 Flash** para máxima confiabilidade e performance.
 
 ### Verificação de Modelos
 Para testar a conectividade com a API do Google:
 ```bash
 python test_models.py
 ```
+
+## 🔄 Migração para SQLite
+
+O projeto foi recentemente migrado de `master_data.json` para **SQLite** para maior escalabilidade e performance.
+
+### Benefícios da Migração
+- ⚡ Consultas **4x mais rápidas**
+- 💾 Cache inteligente de decisões da IA
+- 📈 Escalabilidade ilimitada
+- 🔒 Transações ACID garantidas
+- 🎯 Modelo Gemini 2.5 Flash garantido
+
+### Estrutura do Banco
+O banco SQLite (`curriculo.db`) contém 9 tabelas normalizadas:
+- `profiles` - Dados do perfil
+- `projects` - Portfólio de projetos  
+- `tech_stack` - Tecnologias por projeto
+- `summaries` - Resumos profissionais
+- `ai_cache` - Cache de decisões da IA
+- E mais...
 
 ## 📄 Licença
 

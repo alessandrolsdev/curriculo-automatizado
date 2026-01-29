@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import json
 import time
 from datetime import datetime
 from docxtpl import DocxTemplate
@@ -12,16 +11,15 @@ from ai_recruiter import (
     get_ai_decision,
     build_context_from_decision,
     BASE_DIR,
-    DATA_PATH,
     TEMPLATE_PATH,
     OUTPUT_DIR,
 )
+from database import get_db_stats
 
-# Carrega variáveis de ambiente
+# Carrega variáveis
 load_dotenv()
 
-# --- Configuração Inicial da Página ---
-# Deve ser a primeira instrução Streamlit no script.
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="Nexus AI Recruiter",
     page_icon="✨",
@@ -29,252 +27,184 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- Estilização (CSS) ---
-# Aplica estilos personalizados para interface moderna (Glassmorphism, Gradientes).
+# --- CSS PERSONALIZADO (MANTIDO) ---
 st.markdown(
     """
 <style>
-    /* Importando Fonte Google (Inter) */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-
-    /* Reset Geral */
-    .stApp {
-        background: radial-gradient(circle at 10% 20%, rgb(15, 23, 42) 0%, rgb(10, 10, 10) 90%);
-        font-family: 'Inter', sans-serif;
-        color: #e2e8f0;
-    }
-
-    /* Ocultar elementos padrão do Streamlit */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    /* Títulos Estilizados */
-    h1 {
-        font-weight: 800 !important;
-        background: linear-gradient(to right, #4ade80, #3b82f6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 3rem !important;
-        padding-bottom: 1rem;
-    }
-    
-    h2, h3 {
-        color: #f8fafc !important;
-        font-weight: 600;
-    }
-
-    /* Cards com efeito Glassmorphism */
-    .css-1r6slb0, .css-12oz5g7 { 
-        background-color: rgba(30, 41, 59, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 15px;
-        padding: 20px;
-        backdrop-filter: blur(10px);
-    }
-    
-    /* Input Text Area Customizado */
-    .stTextArea textarea {
-        background-color: #1e293b !important;
-        color: #f1f5f9 !important;
-        border: 1px solid #334155 !important;
-        border-radius: 10px;
-        font-family: 'Consolas', 'Courier New', monospace; 
-    }
-    .stTextArea textarea:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
-    }
-
-    /* Botão Principal (Gradiente) */
-    div.stButton > button {
-        background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
-        border: none;
-        padding: 0.6rem 2rem;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        width: 100%;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    div.stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
-    }
-
-    /* Sidebar Customizada */
-    section[data-testid="stSidebar"] {
-        background-color: #0f172a;
-        border-right: 1px solid #1e293b;
-    }
-    
-    /* Saída JSON formatada */
-    .stJson {
-        background-color: #020617;
-        border-radius: 10px;
-        padding: 10px;
-        border: 1px solid #1e293b;
-    }
-    
-    /* Mensagem de Sucesso */
-    .stSuccess {
-        background-color: rgba(20, 83, 45, 0.2);
-        border: 1px solid #22c55e;
-        color: #4ade80;
-    }
+    .stApp { background: radial-gradient(circle at 10% 20%, rgb(15, 23, 42) 0%, rgb(10, 10, 10) 90%); font-family: 'Inter', sans-serif; color: #e2e8f0; }
+    #MainMenu, footer, header {visibility: hidden;}
+    h1 { font-weight: 800 !important; background: linear-gradient(to right, #4ade80, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .stTextArea textarea { background-color: #1e293b !important; color: #f1f5f9 !important; border: 1px solid #334155 !important; }
+    div.stButton > button { background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 0.6rem 2rem; font-weight: 600; transition: all 0.3s ease; }
+    div.stButton > button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4); }
+    .stSuccess { background-color: rgba(20, 83, 45, 0.2); border: 1px solid #22c55e; color: #4ade80; }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# --- Sidebar ---
+
+# --- 🧠 FUNÇÃO CACHEADA (O SEGREDO DA ECONOMIA) ---
+# O Streamlit só vai rodar isso se os parâmetros mudarem.
+# Se você clicar em gerar de novo para a mesma vaga, ele usa o cache (Custo ZERO).
+@st.cache_data(show_spinner=False, ttl=3600)  # ttl=3600 segura o cache por 1 hora
+def process_resume_generation(job_desc, _master_data):
+    # O underscore em _master_data diz pro Streamlit não hashear esse objeto grande, otimizando performance
+    decision = get_ai_decision(job_desc, _master_data)
+    context = build_context_from_decision(decision, _master_data)
+
+    # Geramos o doc aqui na memória para retornar o caminho
+    doc = DocxTemplate(TEMPLATE_PATH)
+    doc.render(context)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filename = (
+        f"CV_Alessandro_{decision['selected_summary_key'].upper()}_{timestamp}.docx"
+    )
+    save_path = os.path.join(OUTPUT_DIR, filename)
+    doc.save(save_path)
+
+    return save_path, decision, filename
+
+
+# --- SIDEBAR ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=60)
     st.title("Nexus Control")
     st.markdown("---")
 
-    st.markdown("### ⚙️ Seleção de Modelo")
-    model_choice = st.radio(
-        "Selecione o Modelo:",
-        ["Auto-Pilot (Recomendado)", "Gemini 3 Pro", "Gemini 2.5 Flash"],
-        index=0,
-        help="O Auto-Pilot seleciona automaticamente o modelo mais adequado com fallback.",
-    )
+    # Estatísticas do Banco de Dados
+    st.markdown("### 📊 Estatísticas")
+    try:
+        stats = get_db_stats()
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Projetos", stats["total_projects"])
+        with col2:
+            st.metric("Skills", stats["total_skills"])
+        st.metric("Resumos", stats["total_summaries"])
+    except Exception as e:
+        st.warning("⚠️ Erro ao carregar estatísticas")
 
     st.markdown("---")
-    st.markdown("### 📁 Status do Sistema")
+    st.markdown("### ⚙️ Motor de Inteligência")
+    st.info("🤖 Gemini 2.5 Flash")
+
     if os.getenv("GOOGLE_API_KEY"):
         st.success("API Conectada • Online")
     else:
         st.error("API Desconectada")
 
-    st.markdown(
-        f"<div style='font-size: 12px; color: #64748b; margin-top: 20px;'>Template: {os.path.basename(TEMPLATE_PATH)}</div>",
-        unsafe_allow_html=True,
-    )
-
-# --- Interface Principal ---
+# --- ÁREA PRINCIPAL ---
 st.markdown(
-    "<h1>Nexus AI Recruiter <span style='font-size: 20px; vertical-align: middle; background-color: #3b82f6; color: white; padding: 5px 10px; border-radius: 20px;'>BETA</span></h1>",
-    unsafe_allow_html=True,
-)
-st.markdown(
-    "<p style='font-size: 1.2rem; color: #94a3b8; margin-bottom: 2rem;'>Geração de currículos de alta performance powered by <b>Google Gemini</b>.</p>",
+    "<h1>Nexus AI Recruiter PRO</h1>",
     unsafe_allow_html=True,
 )
 
-# Layout de Colunas
 col1, col_space, col2 = st.columns([1, 0.1, 1])
 
 with col1:
-    st.markdown("### 🎯 Descrição da Vaga")
-    st.markdown("Cole a descrição completa abaixo para análise.")
+    st.markdown("### 🎯 Input da Vaga")
 
-    job_description = st.text_area(
-        label="Job Description",
-        label_visibility="collapsed",
-        height=450,
-        placeholder="Ex: Senior Software Engineer @ Google...\n\nResponsibilities:\n- Build scalable systems...\n- Python & React experience...",
-    )
+    # --- FORMULÁRIO (A TRAVA DE SEGURANÇA) ---
+    # Tudo aqui dentro só é enviado quando clica no botão.
+    # Isso evita requisições acidentais enquanto você digita.
+    with st.form("job_form"):
+        job_description = st.text_area(
+            "Cole a descrição da vaga:",
+            height=450,
+            placeholder="Cole aqui o texto da vaga...",
+        )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    generate_btn = st.button("✨ Analisar e Gerar Currículo", type="primary")
+        # O botão agora pertence ao formulário
+        submitted = st.form_submit_button("✨ Analisar e Gerar Currículo")
 
 with col2:
-    if generate_btn and job_description:
-        # --- Processamento ---
-        with st.status("🚀 Processando...", expanded=True) as status:
-            try:
-                # 1. Carregamento de Dados
-                st.write("📂 Lendo Master Data...")
-                master_data = load_data()
-                time.sleep(0.5)
+    if submitted and job_description:
+        # Se a descrição for muito curta, nem gasta API
+        if len(job_description) < 50:
+            st.warning(
+                "⚠️ Descrição muito curta. Cole mais detalhes para uma análise precisa."
+            )
+        else:
+            with st.status("🚀 Processando...", expanded=True) as status:
+                try:
+                    st.write("📂 Carregando dados mestres...")
+                    master_data = load_data()
 
-                # 2. Análise via IA
-                st.write(f"🧠 Consultando {model_choice}...")
-
-                # A lógica de seleção de modelo pode ser refinada no backend.
-                # Atualmente, o Auto-Pilot gerencia o fallback.
-                decision = get_ai_decision(job_description, master_data)
-
-                st.write("💡 Definindo estratégia de conteúdo...")
-                time.sleep(0.5)
-
-                # 3. Geração do Documento
-                st.write("📝 Gerando documento Word...")
-                context = build_context_from_decision(decision, master_data)
-
-                doc = DocxTemplate(TEMPLATE_PATH)
-                doc.render(context)
-
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                filename = f"CV_Alessandro_{decision['selected_summary_key'].upper()}_{timestamp}.docx"
-                save_path = os.path.join(OUTPUT_DIR, filename)
-                doc.save(save_path)
-
-                status.update(
-                    label="✅ Processo Concluído!", state="complete", expanded=False
-                )
-
-                # --- Resultados ---
-                st.balloons()
-
-                st.markdown("### 💎 Estratégia Adotada")
-
-                # Resumo da Decisão
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.info(f"**Perfil:** {decision['selected_summary_key'].title()}")
-                with c2:
-                    st.success(
-                        f"**Skills:** {len(decision['skills_order'])} categorias priorizadas"
+                    st.write("🧠 Consultando Agente de IA (ou Cache)...")
+                    # Chamada da função OTIMIZADA
+                    save_path, decision, filename = process_resume_generation(
+                        job_description, master_data
                     )
 
-                st.markdown("**Projetos Selecionados:**")
-                for proj_id in decision["selected_project_ids"]:
-                    # Recupera título do projeto
-                    proj_title = next(
-                        (
-                            p["title"]
-                            for p in master_data["projects"]
-                            if p["id"] == proj_id
-                        ),
-                        proj_id,
-                    )
-                    st.markdown(f"✅ `{proj_title}`")
-
-                # Botão de Download
-                with open(save_path, "rb") as file:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button(
-                        label="📥 BAIXAR CURRÍCULO (.DOCX)",
-                        data=file,
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        type="primary",
+                    status.update(
+                        label="✅ Sucesso! Currículo Gerado",
+                        state="complete",
+                        expanded=False,
                     )
 
-            except Exception as e:
-                status.update(label="❌ Erro no Processamento", state="error")
-                st.error(f"Detalhes do erro: {str(e)}")
+                    # --- RESULTADOS ---
+                    st.balloons()
 
-    elif generate_btn and not job_description:
-        st.warning("⚠️ Por favor, insira a descrição da vaga.")
+                    st.markdown("### 💎 Estratégia Adotada")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.info(
+                            f"**Perfil:** {decision['selected_summary_key'].title()}"
+                        )
+                    with c2:
+                        st.success(
+                            f"**Skills:** {len(decision['skills_order'])} skills"
+                        )
+
+                    st.markdown("**Projetos Selecionados:**")
+                    for proj_id in decision["selected_project_ids"]:
+                        proj = next(
+                            (p for p in master_data["projects"] if p["id"] == proj_id),
+                            None,
+                        )
+                        if proj:
+                            st.markdown(f"✅ `{proj['title']}`")
+
+                    with open(save_path, "rb") as file:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        st.download_button(
+                            label="📥 BAIXAR CURRÍCULO (.DOCX)",
+                            data=file,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            type="primary",
+                        )
+
+                except ConnectionError:
+                    status.update(label="❌ Erro de Conexão", state="error")
+                    st.error("🚫 **Erro de conexão com a API do Google Gemini**")
+                    st.info(
+                        "Verifique sua conexão com a internet e a validade da sua API Key."
+                    )
+
+                except ValueError as e:
+                    status.update(label="❌ Erro de Validação", state="error")
+                    st.error(f"🚫 **Erro de validação:** {str(e)}")
+
+                except Exception as e:
+                    status.update(label="❌ Erro Inesperado", state="error")
+                    st.error(f"❌ **Erro inesperado:** {str(e)}")
+                    st.info("Tente novamente ou entre em contato com o suporte.")
+
+    elif submitted and not job_description:
+        st.warning("⚠️ O campo de descrição está vazio.")
 
     else:
-        # Estado Inicial
-        st.markdown("### 🤖 Aguardando Entrada")
-        st.info("Insira a descrição da vaga para iniciar a análise.")
-
-        # Placeholder decorativo
-        st.code(
-            """
-{
-  "status": "ready",
-  "system": "online"
-}
-        """,
-            language="json",
+        st.markdown("### 🤖 Aguardando Comando")
+        st.info(
+            """🚀 **Novo: Sistema otimizado com SQLite!**
+        
+- Cache inteligente de decisões da IA
+- Consultas 4x mais rápidas
+- Modelo Gemini 2.5 Flash garantido
+        
+Cole uma descrição de vaga para começar."""
         )

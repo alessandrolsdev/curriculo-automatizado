@@ -1,0 +1,502 @@
+{
+  "profile": {
+    "name": "Alessandro Lima da Silva",
+    "contact": {
+      "email": "alessandrolsdev@gmail.com",
+      "phone": "+55 (67) 99171-0135",
+      "linkedin": "linkedin.com/in/alessandrolsdev",
+      "github": "github.com/alessandrolsdev",
+      "location": "Campo Grande - MS, Brasil (Remote)"
+    },
+    "education": [
+      {
+        "degree": "Bacharelado em Engenharia de Software",
+        "institution": "Universidade Estácio de Sá",
+        "period": "03/2022 - 03/2026 (Previsão)"
+      }
+    ],
+    "languages": [
+      "Português (Nativo)",
+      "Inglês (Técnico/Intermediário)"
+    ],
+    "hard_skills": [
+      "JavaScript (ES6+)",
+      "TypeScript",
+      "Python 3.12",
+      "Dart",
+      "React.js",
+      "Next.js",
+      "Vue.js 3",
+      "Angular 18",
+      "Flutter",
+      "Node.js",
+      "FastAPI",
+      "NestJS",
+      "Fastify",
+      "Django",
+      "GraphQL",
+      "REST API",
+      "gRPC",
+      "WebSockets",
+      "PostgreSQL",
+      "MongoDB",
+      "Redis",
+      "Firebase",
+      "Supabase",
+      "Docker",
+      "CI/CD (GitHub Actions)",
+      "AWS (Basic)",
+      "Google Cloud",
+      "LangChain",
+      "OpenAI API",
+      "Gemini API",
+      "RAG",
+      "Clean Architecture",
+      "SOLID",
+      "TDD",
+      "DDD"
+    ]
+  },
+  "summaries": {
+    "frontend": "Desenvolvedor Frontend Especialista com domínio da 'Tríade Moderna' (React, Vue, Angular). Focado em performance (Core Web Vitals), acessibilidade e arquiteturas escaláveis (Micro-frontends). Experiência comprovada em PWAs e Design Systems complexos.",
+    "backend": "Engenheiro de Backend focado em sistemas distribuídos e alta performance. Especialista em Python (FastAPI) e Node.js (NestJS/Fastify), com forte base em arquitetura de microsserviços, filas (Redis/BullMQ) e bancos de dados SQL/NoSQL.",
+    "fullstack": "Desenvolvedor Fullstack Versátil com capacidade de entrega ponta a ponta. Experiência robusta transitando entre stacks JS/TS e Python, entregando desde interfaces pixel-perfect até APIs resilientes e escaláveis.",
+    "mobile": "Desenvolvedor Mobile focado em Flutter e arquiteturas limpas. Experiência na criação de apps nativos/híbridos com integração complexa de hardware, mapas e serviços em tempo real (Firebase).",
+    "ai_engineer": "Engenheiro de IA Aplicada focado em integração de LLMs (Gemini/GPT) em produtos reais. Experiência com LangChain, RAG, Agentes Autônomos e Visão Computacional, unindo Engenharia de Software sólida com o estado da arte em IA."
+  },
+  "projects": [
+    {
+      "id": "nexus_ai_recruiter",
+      "title": "Nexus AI Recruiter - Intelligent Resume Agent",
+      "tech_stack": [
+        "Python 3.12",
+        "LangChain",
+        "Gemini API 3.0",
+        "Streamlit",
+        "RAG",
+        "Jinja2"
+      ],
+      "type": "AI Engineering",
+      "descriptions": [
+        {
+          "focus": "ai_engineering",
+          "text": "Desenvolvimento de agente autônomo com LangChain e Gemini para análise semântica de vagas. Implementação de Prompt Engineering avançado para tomada de decisão e geração de documentos personalizados."
+        },
+        {
+          "focus": "backend",
+          "text": "Arquitetura resiliente em Python com estratégia de Fallback automática entre modelos de IA. Automação de geração de arquivos .docx dinâmicos baseados em templates Jinja2."
+        },
+        {
+          "focus": "english",
+          "text": "Built an autonomous AI agent using LangChain and Google Gemini to semantically analyze job descriptions and generate tailored resumes with a modern Streamlit UI."
+        }
+      ]
+    },
+    {
+      "id": "rpg_task_manager",
+      "title": "RPG Task Manager - Event-Driven Gamification",
+      "tech_stack": [
+        "NestJS",
+        "GraphQL",
+        "React 18",
+        "Redis",
+        "BullMQ",
+        "PostgreSQL",
+        "Docker"
+      ],
+      "type": "Backend",
+      "descriptions": [
+        {
+          "focus": "backend",
+          "text": "Arquitetura orientada a eventos (Event-Driven) com NestJS e Redis. Filas assíncronas (BullMQ) para cálculos de gamificação (XP/Níveis) em background, garantindo baixa latência na API."
+        },
+        {
+          "focus": "fullstack",
+          "text": "Sistema Fullstack complexo com GraphQL (Code First) e Prisma ORM. Frontend React com Optimistic UI para refletir atualizações de estado instantaneamente."
+        },
+        {
+          "focus": "english",
+          "text": "Engineered an event-driven system using NestJS and Redis/BullMQ for asynchronous gamification logic. Implemented a type-safe GraphQL API and a Dockerized infrastructure."
+        }
+      ]
+    },
+    {
+      "id": "atos_gamification",
+      "title": "ATOS - Gamified Community App",
+      "tech_stack": [
+        "Flutter 3.0",
+        "Dart",
+        "Firebase",
+        "Clean Architecture",
+        "Google Maps",
+        "NoSQL"
+      ],
+      "type": "Mobile",
+      "descriptions": [
+        {
+          "focus": "mobile",
+          "text": "App multiplataforma (iOS/Android) com Flutter e Clean Architecture. Integração de geolocalização, charts e uploads de mídia otimizados."
+        },
+        {
+          "focus": "backend",
+          "text": "Backend Serverless com Firebase (Auth, Firestore, Messaging). Gerenciamento de dados em tempo real e sistema de engajamento via Push Notifications."
+        },
+        {
+          "focus": "english",
+          "text": "Developed a gamified social platform using Flutter and Firebase. Features include real-time feeds, geolocation events, and a robust codebase following Clean Architecture."
+        }
+      ]
+    },
+    {
+      "id": "arena_iron_beach",
+      "title": "Arena Iron Beach - Premium Scheduling PWA",
+      "tech_stack": [
+        "React 19",
+        "Supabase",
+        "Tailwind v4",
+        "Vite",
+        "PWA",
+        "PostgreSQL"
+      ],
+      "type": "Fullstack",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Interface premium com React 19, Tailwind v4 e Radix UI (Glassmorphism). Roteamento moderno com React Router v7 e experiência PWA offline-first."
+        },
+        {
+          "focus": "fullstack",
+          "text": "Arquitetura Serverless com Supabase (PostgreSQL + Auth). Sistema de agendamento em tempo real e painel administrativo seguro."
+        },
+        {
+          "focus": "english",
+          "text": "Built a high-performance PWA for scheduling using React 19 and Supabase. Features real-time booking, secure admin dashboard, and premium UI with Tailwind v4."
+        }
+      ]
+    },
+    {
+      "id": "saas_mestre_boilerplate",
+      "title": "SaaS Mestre - Enterprise Boilerplate",
+      "tech_stack": [
+        "FastAPI",
+        "Vue 3",
+        "Python 3.10",
+        "SQLAlchemy",
+        "Clean Architecture",
+        "OAuth2"
+      ],
+      "type": "Architecture",
+      "descriptions": [
+        {
+          "focus": "architecture",
+          "text": "Acelerador SaaS com Clean Architecture, garantindo desacoplamento entre camadas. Padrões de engenharia para escalabilidade e manutenção."
+        },
+        {
+          "focus": "backend",
+          "text": "API RESTful robusta com FastAPI, OAuth2 (JWT), SQLAlchemy e agendamento de tarefas em background (APScheduler)."
+        },
+        {
+          "focus": "english",
+          "text": "Architected a scalable SaaS boilerplate using FastAPI and Vue 3. Implemented Clean Architecture, OAuth2 authentication, and background task scheduling."
+        }
+      ]
+    },
+    {
+      "id": "clutch_discord_bot",
+      "title": "Clutch - AI & Real-Time Audio Platform",
+      "tech_stack": [
+        "Python 3.11",
+        "Discord.py",
+        "UDP Sockets",
+        "FFmpeg",
+        "Gemini AI",
+        "Streamlit"
+      ],
+      "type": "Backend",
+      "descriptions": [
+        {
+          "focus": "backend",
+          "text": "Sistema distribuído complexo usando UDP Sockets para streaming de áudio em tempo real e API REST (Aiohttp) para controle remoto."
+        },
+        {
+          "focus": "ai",
+          "text": "Integração profunda com Gemini Flash para Chatbots com memória e análise de sentimento ('Vibe Check') em tempo real."
+        },
+        {
+          "focus": "english",
+          "text": "Developed an advanced AI platform featuring real-time audio streaming via UDP and voice modulation (DSP). Integrated Gemini LLM for dynamic interactions."
+        }
+      ]
+    },
+    {
+      "id": "legendary_feed_ai",
+      "title": "Legendary Feed AI - Multimodal Vision",
+      "tech_stack": [
+        "React 19",
+        "FastAPI",
+        "Gemini Vision",
+        "Python",
+        "Vite",
+        "TailwindCSS"
+      ],
+      "type": "AI",
+      "descriptions": [
+        {
+          "focus": "ai",
+          "text": "Aplicação de IA Multimodal (Image-to-Text) usando Gemini Vision para classificar imagens em tiers de RPG com base em contexto visual."
+        },
+        {
+          "focus": "fullstack",
+          "text": "Frontend React 19 'Bleeding Edge' conectado a backend FastAPI assíncrono. Animações de feedback baseadas na análise da IA."
+        },
+        {
+          "focus": "english",
+          "text": "Created a gamified AI platform using React 19 and Gemini Vision to analyze and classify user photos into RPG rarity tiers based on visual context."
+        }
+      ]
+    },
+    {
+      "id": "banco_new_system",
+      "title": "Banco New - Banking System (GraphQL)",
+      "tech_stack": [
+        "Angular 18",
+        "Python",
+        "FastAPI",
+        "GraphQL",
+        "Docker",
+        "SQLAlchemy"
+      ],
+      "type": "Fullstack",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Interface Enterprise com Angular 18 (Signals/Standalone). Consumo de GraphQL otimizado com Apollo Client e Design System Material 3."
+        },
+        {
+          "focus": "backend",
+          "text": "API GraphQL tipada com Strawberry (Python). Implementação de transações financeiras atômicas (ACID) e segurança JWT."
+        },
+        {
+          "focus": "english",
+          "text": "Built a comprehensive banking platform using Angular 18 and FastAPI GraphQL. Implemented atomic transactions and a Dockerized environment."
+        }
+      ]
+    },
+    {
+      "id": "autoscan_extractor",
+      "title": "AutoScanExtractor - Intelligent RPA Bot",
+      "tech_stack": [
+        "Python",
+        "Tkinter",
+        "Tesseract OCR",
+        "OpenCV",
+        "Pandas",
+        "PyInstaller"
+      ],
+      "type": "Automation",
+      "descriptions": [
+        {
+          "focus": "backend",
+          "text": "Solução RPA Desktop para extração de dados financeiros. Motor híbrido: Regex para PDFs digitais e OCR (Tesseract) para imagens."
+        },
+        {
+          "focus": "data",
+          "text": "Pipeline de dados com Pandas e pré-processamento de imagens com OpenCV. Distribuição via executável (.exe) empacotado."
+        },
+        {
+          "focus": "english",
+          "text": "Architected a desktop RPA bot for invoice processing using Python. Implemented a hybrid extraction engine combining Regex and Tesseract OCR."
+        }
+      ]
+    },
+    {
+      "id": "project_clutch",
+      "title": "Project CLUTCH - High-Performance Social",
+      "tech_stack": [
+        "Vue 3",
+        "Fastify",
+        "Node.js",
+        "Redis",
+        "PostgreSQL",
+        "Docker",
+        "Tailwind v4"
+      ],
+      "type": "Fullstack",
+      "descriptions": [
+        {
+          "focus": "backend",
+          "text": "API de alta performance com Fastify e Node.js. Foco em baixo overhead, validação Zod e cache distribuído com Redis."
+        },
+        {
+          "focus": "frontend",
+          "text": "Frontend Vue 3 (Composition API) com Pinia e Tailwind v4. Otimização para latência sub-milissegundo em interações sociais."
+        },
+        {
+          "focus": "english",
+          "text": "Architected a high-performance social platform using Fastify and Vue 3. Focused on concurrency, caching with Redis, and low-latency interactions."
+        }
+      ]
+    },
+    {
+      "id": "nomad_finance_system",
+      "title": "NOMAD - Financial PWA",
+      "tech_stack": [
+        "React 18",
+        "FastAPI",
+        "Python",
+        "PWA",
+        "SQLAlchemy",
+        "Pydantic"
+      ],
+      "type": "Fullstack",
+      "descriptions": [
+        {
+          "focus": "fullstack",
+          "text": "PWA Offline-First com React e FastAPI. Sincronização de dados background e instalação nativa em dispositivos móveis."
+        },
+        {
+          "focus": "backend",
+          "text": "API Async com Python 3.12, validação Pydantic V2 e segurança via Hashing Argon2."
+        },
+        {
+          "focus": "english",
+          "text": "Developed a robust Fintech PWA with offline capabilities using React and FastAPI. Implemented secure authentication and real-time dashboards."
+        }
+      ]
+    },
+    {
+      "id": "interactive_portfolio",
+      "title": "Interactive Cyberpunk Portfolio",
+      "tech_stack": [
+        "Next.js 14",
+        "TypeScript",
+        "Framer Motion",
+        "Gemini API",
+        "Tailwind"
+      ],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Interface imersiva 'Cyberpunk' com Next.js 14 e Framer Motion. Micro-interações complexas, 3D Tilt e Chatbot de IA integrado."
+        },
+        {
+          "focus": "english",
+          "text": "Created an immersive portfolio using Next.js 14 and Framer Motion. Integrated Gemini AI for a conversational terminal interface."
+        }
+      ]
+    },
+    {
+      "id": "relay_flow",
+      "title": "Relay Flow - GraphQL Data Fetching",
+      "tech_stack": [
+        "React",
+        "Relay",
+        "GraphQL",
+        "Node.js",
+        "Express",
+        "Jest"
+      ],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Implementação avançada de Data Fetching com Relay e GraphQL. Padrão 'Data Colocation' e atualizações de UI Otimista (Optimistic UI)."
+        },
+        {
+          "focus": "english",
+          "text": "Implemented advanced data fetching patterns using Relay and GraphQL. Utilized Data Colocation and Optimistic UI updates."
+        }
+      ]
+    },
+    {
+      "id": "pokedex_webpack",
+      "title": "Dynamic Pokédex - Webpack & Vanilla JS",
+      "tech_stack": [
+        "JavaScript (ES6+)",
+        "Webpack 5",
+        "HTML5/CSS3",
+        "Babel",
+        "REST API"
+      ],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "SPA responsiva com Vanilla JS puro. Configuração manual de Webpack 5 (Loaders/Plugins) e otimização de bundle sem frameworks."
+        },
+        {
+          "focus": "english",
+          "text": "Built a dynamic app using pure Vanilla JavaScript and a custom Webpack 5 configuration. Demonstrated deep understanding of the DOM and build tools."
+        }
+      ]
+    },
+    {
+      "id": "landing_page_matias",
+      "title": "Matias Ramão Advocacia - High Performance",
+      "tech_stack": [
+        "Vue 3",
+        "TypeScript",
+        "Vite",
+        "Tailwind",
+        "SEO",
+        "Netlify"
+      ],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Landing Page de alta performance com Vue 3 e TypeScript Strict. Otimização de Core Web Vitals, SEO avançado e Tree Shaking."
+        },
+        {
+          "focus": "english",
+          "text": "Developed a high-performance landing page using Vue 3 and TypeScript. Focused on SEO, strict type safety, and fast load times."
+        }
+      ]
+    },
+    {
+      "id": "landing_page_sarah",
+      "title": "Legal Landing Page - Conversion UI",
+      "tech_stack": [
+        "React",
+        "Vite",
+        "Tailwind",
+        "WhatsApp API",
+        "UX/UI"
+      ],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Page focada em conversão (CRO) com React e Vite. Design System premium e integração direta com WhatsApp API para leads."
+        },
+        {
+          "focus": "english",
+          "text": "Developed a high-conversion landing page using React and Vite. Features direct WhatsApp integration and a config-driven architecture."
+        }
+      ]
+    },
+    {
+      "id": "vitta_clinic_landing",
+      "title": "Vitta Clinic - Pediatric Page",
+      "tech_stack": [
+        "React",
+        "Vite",
+        "CSS3",
+        "React Slick",
+        "AOS"
+      ],
+      "type": "Frontend",
+      "descriptions": [
+        {
+          "focus": "frontend",
+          "text": "Interface acolhedora para área da saúde com React. Animações de scroll (AOS), carrosséis interativos e design responsivo fluido."
+        },
+        {
+          "focus": "english",
+          "text": "Developed a responsive landing page for a clinic using React. Features smooth scroll animations and interactive carousels."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "Alessandro Lima da Silva",
+  "role": "Desenvolvedor Frontend",
+  "linkedin": "linkedin.com/in/alessandrolsdev",
+  "github": "github.com/alessandrolsdev",
+  "email": "alessandrolsdev@gmail.com",
+  "phone": "+55 (67) 99171-0135",
+  "location": "Campo Grande - MS, Brasil (Remote)",
+  "summary": "Desenvolvedor Frontend Especialista com domínio da 'Tríade Moderna' (React, Vue, Angular). Focado em performance (Core Web Vitals), acessibilidade e arquiteturas escaláveis (Micro-frontends). Experiência comprovada em PWAs e Design Systems complexos.",
+  "skills": [
+    "React.js",
+    "TypeScript",
+    "Next.js",
+    "Tailwind",
+    "Vue.js 3"
+  ],
+  "skills_list": [
+    {
+      "name": "React.js"
+    },
+    {
+      "name": "TypeScript"
+    },
+    {
+      "name": "Next.js"
+    },
+    {
+      "name": "Tailwind"
+    },
+    {
+      "name": "Vue.js 3"
+    }
+  ],
+  "skills_str": "React.js, TypeScript, Next.js, Tailwind, Vue.js 3",
+  "education": {
+    "degree": "Bacharelado em Engenharia de Software",
+    "institution": "Universidade Estácio de Sá",
+    "period": "03/2022 - 03/2026 (Previsão)"
+  },
+  "projects": [
+    {
+      "title": "Arena Iron Beach - Premium Scheduling PWA",
+      "tech": "React 19 | Supabase | Tailwind v4 | Vite | PWA | PostgreSQL",
+      "description": "Interface premium com React 19, Tailwind v4 e Radix UI (Glassmorphism). Roteamento moderno com React Router v7 e experiência PWA offline-first."
+    },
+    {
+      "title": "Interactive Cyberpunk Portfolio",
+      "tech": "Next.js 14 | TypeScript | Framer Motion | Gemini API | Tailwind",
+      "description": "Interface imersiva 'Cyberpunk' com Next.js 14 e Framer Motion. Micro-interações complexas, 3D Tilt e Chatbot de IA integrado."
+    },
+    {
+      "title": "Matias Ramão Advocacia - High Performance",
+      "tech": "Vue 3 | TypeScript | Vite | Tailwind | SEO | Netlify",
+      "description": "Landing Page de alta performance com Vue 3 e TypeScript Strict. Otimização de Core Web Vitals, SEO avançado e Tree Shaking."
+    }
+  ],
+  "experience": {
+    "role": "Estagiário de Tecnologia da Informação",
+    "company": "Aegea Saneamento",
+    "period": "Set 2022 - Set 2025",
+    "details": [
+      "Gerenciamento e configuração de ativos corporativos utilizando Microsoft Azure.",
+      "Suporte na resolução de falhas de rede e sistemas em ambiente de grande escala.",
+      "Atuação com metodologias ágeis no atendimento a chamados técnicos."
+    ]
+  }
+}
