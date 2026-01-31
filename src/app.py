@@ -5,19 +5,25 @@ from datetime import datetime
 from docxtpl import DocxTemplate
 from dotenv import load_dotenv
 
-# Importando backend
-from ai_recruiter import (
-    load_data,
+# 🆕 Importa da versão V8 com i18n
+from ai_service import (  # ou ai_service_v8 se não renomeou
     get_ai_decision,
     build_context_from_decision,
-    BASE_DIR,
-    TEMPLATE_PATH,
-    OUTPUT_DIR,
+    load_data,
 )
 from database import get_db_stats
 
-# Carrega variáveis
+# Carrega variáveis de ambiente
 load_dotenv()
+
+# --- CONFIGURAÇÃO DE CAMINHOS ---
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 🆕 REMOVIDO: Template fixo (agora é dinâmico)
+# TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "base_template.docx")
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+
+# Garante que a pasta de output existe
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -27,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- CSS PERSONALIZADO (MANTIDO) ---
+# --- CSS PERSONALIZADO ---
 st.markdown(
     """
 <style>
@@ -45,27 +51,38 @@ st.markdown(
 )
 
 
-# --- 🧠 FUNÇÃO CACHEADA (O SEGREDO DA ECONOMIA) ---
-# O Streamlit só vai rodar isso se os parâmetros mudarem.
-# Se você clicar em gerar de novo para a mesma vaga, ele usa o cache (Custo ZERO).
-@st.cache_data(show_spinner=False, ttl=3600)  # ttl=3600 segura o cache por 1 hora
+# --- 🧠 FUNÇÃO DE GERAÇÃO (Atualizada V8) ---
+@st.cache_data(show_spinner=False, ttl=3600)
 def process_resume_generation(job_desc, _master_data):
-    # O underscore em _master_data diz pro Streamlit não hashear esse objeto grande, otimizando performance
+    # 1. 🆕 IA Decide + Detecta Idioma
     decision = get_ai_decision(job_desc, _master_data)
+    
+    # 2. 🆕 Monta Contexto com Traduções
     context = build_context_from_decision(decision, _master_data)
 
-    # Geramos o doc aqui na memória para retornar o caminho
-    doc = DocxTemplate(TEMPLATE_PATH)
-    doc.render(context)
+    # 3. 🆕 Usa Template Dinâmico (PT ou EN)
+    template_path = context["template_path"]
+    language_code = context["language_code"]
+    
+    try:
+        doc = DocxTemplate(template_path)
+        doc.render(context)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    filename = (
-        f"CV_Alessandro_{decision['selected_summary_key'].upper()}_{timestamp}.docx"
-    )
-    save_path = os.path.join(OUTPUT_DIR, filename)
-    doc.save(save_path)
-
-    return save_path, decision, filename
+        # Gera nome de arquivo único
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_title = decision.get("adapted_role_title", "Currículo").split("|")[0].strip().replace(" ", "_")
+        
+        # 🆕 Adiciona idioma no nome do arquivo
+        lang_suffix = "EN" if language_code == "en-US" else "PT"
+        filename = f"CV_Alessandro_{safe_title}_{lang_suffix}_{timestamp}.docx"
+        
+        save_path = os.path.join(OUTPUT_DIR, filename)
+        doc.save(save_path)
+        
+        return save_path, decision, filename, language_code
+        
+    except Exception as e:
+        raise RuntimeError(f"Erro ao renderizar/salvar DOCX: {str(e)}")
 
 
 # --- SIDEBAR ---
@@ -74,7 +91,6 @@ with st.sidebar:
     st.title("Nexus Control")
     st.markdown("---")
 
-    # Estatísticas do Banco de Dados
     st.markdown("### 📊 Estatísticas")
     try:
         stats = get_db_stats()
@@ -88,8 +104,9 @@ with st.sidebar:
         st.warning("⚠️ Erro ao carregar estatísticas")
 
     st.markdown("---")
-    st.markdown("### ⚙️ Motor de Inteligência")
-    st.info("🤖 Gemini 2.5 Flash")
+    # 🆕 Atualizado para V8
+    st.markdown("### ⚙️ Motor V8")
+    st.info("🤖 Ghostwriter + i18n Active")
 
     if os.getenv("GOOGLE_API_KEY"):
         st.success("API Conectada • Online")
@@ -98,7 +115,8 @@ with st.sidebar:
 
 # --- ÁREA PRINCIPAL ---
 st.markdown(
-    "<h1>Nexus AI Recruiter PRO</h1>",
+    # 🆕 Versão atualizada
+    "<h1>Nexus AI Recruiter <span style='font-size:0.5em; vertical-align:top; color:#666'>v8.0</span></h1>",
     unsafe_allow_html=True,
 )
 
@@ -106,41 +124,34 @@ col1, col_space, col2 = st.columns([1, 0.1, 1])
 
 with col1:
     st.markdown("### 🎯 Input da Vaga")
-
-    # --- FORMULÁRIO (A TRAVA DE SEGURANÇA) ---
-    # Tudo aqui dentro só é enviado quando clica no botão.
-    # Isso evita requisições acidentais enquanto você digita.
     with st.form("job_form"):
         job_description = st.text_area(
             "Cole a descrição da vaga:",
             height=450,
-            placeholder="Cole aqui o texto da vaga...",
+            placeholder="Cole aqui o texto da vaga (PT ou EN)...",
         )
-
-        # O botão agora pertence ao formulário
         submitted = st.form_submit_button("✨ Analisar e Gerar Currículo")
 
 with col2:
     if submitted and job_description:
-        # Se a descrição for muito curta, nem gasta API
         if len(job_description) < 50:
-            st.warning(
-                "⚠️ Descrição muito curta. Cole mais detalhes para uma análise precisa."
-            )
+            st.warning("⚠️ Descrição muito curta. Cole mais detalhes.")
         else:
-            with st.status("🚀 Processando...", expanded=True) as status:
+            with st.status("🚀 Ghostwriter trabalhando...", expanded=True) as status:
                 try:
                     st.write("📂 Carregando dados mestres...")
                     master_data = load_data()
 
-                    st.write("🧠 Consultando Agente de IA (ou Cache)...")
-                    # Chamada da função OTIMIZADA
-                    save_path, decision, filename = process_resume_generation(
+                    st.write("🌍 Detectando idioma da vaga...")
+                    st.write("✍️ IA Reescrevendo Perfil (Ghostwriting)...")
+                    
+                    # 🆕 Agora retorna language_code também
+                    save_path, decision, filename, language_code = process_resume_generation(
                         job_description, master_data
                     )
 
                     status.update(
-                        label="✅ Sucesso! Currículo Gerado",
+                        label="✅ Currículo Gerado com Sucesso!",
                         state="complete",
                         expanded=False,
                     )
@@ -148,26 +159,36 @@ with col2:
                     # --- RESULTADOS ---
                     st.balloons()
 
-                    st.markdown("### 💎 Estratégia Adotada")
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.info(
-                            f"**Perfil:** {decision['selected_summary_key'].title()}"
-                        )
-                    with c2:
-                        st.success(
-                            f"**Skills:** {len(decision['skills_order'])} skills"
-                        )
+                    # 🆕 Mostra idioma detectado
+                    lang_flag = "🇧🇷" if language_code == "pt-BR" else "🇺🇸"
+                    st.markdown(f"### {lang_flag} Idioma Detectado: **{language_code}**")
 
-                    st.markdown("**Projetos Selecionados:**")
-                    for proj_id in decision["selected_project_ids"]:
-                        proj = next(
-                            (p for p in master_data["projects"] if p["id"] == proj_id),
-                            None,
-                        )
-                        if proj:
-                            st.markdown(f"✅ `{proj['title']}`")
+                    st.markdown("### 💎 Estratégia de Adaptação")
+                    
+                    # Exibe o Título Adaptado pela IA
+                    adapted_title = decision.get('adapted_role_title', 'Fullstack Developer')
+                    st.success(f"**Título Gerado:** {adapted_title}")
 
+                    # Contagem de Skills
+                    skills_count = 0
+                    if 'skills_categorized' in decision:
+                        skills_count = sum(len(v) for v in decision['skills_categorized'].values())
+                    st.info(f"**Skills Injetadas:** {skills_count} competências")
+
+                    st.markdown("**Projetos Reescritos:**")
+                    if "custom_projects" in decision:
+                        for proj in decision["custom_projects"]:
+                            st.markdown(f"✅ `{proj['adapted_title']}`")
+                    else:
+                        for proj_id in decision.get("selected_project_ids", []):
+                            st.markdown(f"✅ `ID: {proj_id}`")
+
+                    # 🆕 Mostra raciocínio da seleção de projetos
+                    if "project_selection_reasoning" in decision:
+                        with st.expander("🤔 Por que esses projetos?"):
+                            st.write(decision["project_selection_reasoning"])
+
+                    # Botão de Download
                     with open(save_path, "rb") as file:
                         st.markdown("<br>", unsafe_allow_html=True)
                         st.download_button(
@@ -177,22 +198,19 @@ with col2:
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             type="primary",
                         )
+                        st.caption(f"Salvo em: `{save_path}`")
 
                 except ConnectionError:
                     status.update(label="❌ Erro de Conexão", state="error")
-                    st.error("🚫 **Erro de conexão com a API do Google Gemini**")
-                    st.info(
-                        "Verifique sua conexão com a internet e a validade da sua API Key."
-                    )
+                    st.error("Erro na API do Gemini. Verifique sua chave.")
 
                 except ValueError as e:
                     status.update(label="❌ Erro de Validação", state="error")
-                    st.error(f"🚫 **Erro de validação:** {str(e)}")
+                    st.error(f"Erro de validação: {str(e)}")
 
                 except Exception as e:
                     status.update(label="❌ Erro Inesperado", state="error")
-                    st.error(f"❌ **Erro inesperado:** {str(e)}")
-                    st.info("Tente novamente ou entre em contato com o suporte.")
+                    st.error(f"Erro inesperado: {str(e)}")
 
     elif submitted and not job_description:
         st.warning("⚠️ O campo de descrição está vazio.")
@@ -200,11 +218,14 @@ with col2:
     else:
         st.markdown("### 🤖 Aguardando Comando")
         st.info(
-            """🚀 **Novo: Sistema otimizado com SQLite!**
+            """🚀 **Sistema V8 Ghostwriter + i18n Pronto**
         
-- Cache inteligente de decisões da IA
-- Consultas 4x mais rápidas
-- Modelo Gemini 2.5 Flash garantido
+A IA irá:
+1. 🌍 Detectar automaticamente o idioma da vaga (PT ou EN)
+2. ✍️ Reescrever seu título profissional no idioma correto
+3. 📝 Adaptar as descrições dos projetos
+4. 🎯 Usar o template correto (PT-BR ou EN-US)
+5. 💾 Gerar arquivo .docx na pasta `output/`
         
-Cole uma descrição de vaga para começar."""
+Cole uma descrição de vaga em **qualquer idioma** para começar."""
         )
