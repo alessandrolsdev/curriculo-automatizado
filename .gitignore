@@ -1,23 +1,100 @@
+# ===========================================
 # Python
+# ===========================================
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
 .venv/
 venv/
+ENV/
+env/
+.virtualenv/
 
-# Variáveis de Ambiente (Chaves de API)
+# ===========================================
+# Environment Variables (API Keys)
+# ===========================================
 .env
+.env.local
+.env.*.local
 
-# Logs e Outputs (Não versionamos arquivos gerados)
+# ===========================================
+# Logs e Outputs (Arquivos Gerados)
+# ===========================================
 logs/
 output/
 *.log
 *.pdf
 *.docx
+*.zip
 
-# IDEs
+# ===========================================
+# Database
+# ===========================================
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Exceção: queremos manter o curriculo.db de exemplo
+!data/curriculo.db
+
+# ===========================================
+# IDEs e Editores
+# ===========================================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
 
+# ===========================================
 # Sistema Operacional
+# ===========================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+
+# ===========================================
+# Pytest / Testing
+# ===========================================
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# ===========================================
+# Build / Distribution
+# ===========================================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ===========================================
+# Jupyter Notebook
+# ===========================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ===========================================
+# Temporary Files
+# ===========================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.cache
