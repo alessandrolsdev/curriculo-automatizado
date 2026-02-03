@@ -225,25 +225,6 @@ class Language(Base):
         return f"<Language(language='{self.language}')>"
 
 
-class AICache(Base):
-    """
-    Tabela de Cache de Respostas de IA.
-    Armazena decisões da IA para evitar chamadas redundantes à API.
-    """
-
-    __tablename__ = "ai_cache"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    job_description_hash = Column(
-        String(64), nullable=False, unique=True
-    )  # Hash MD5 da descrição
-    decision_json = Column(Text, nullable=False)  # Decisão da IA em formato JSON
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return f"<AICache(hash='{self.job_description_hash[:8]}...')>"
-
-
 # ==================== FUNÇÕES HELPER ====================
 
 
@@ -373,49 +354,6 @@ def get_db_stats() -> Dict[str, int]:
             "total_skills": db.query(HardSkill).count(),
             "total_summaries": db.query(Summary).count(),
         }
-
-
-def save_ai_cache(db: Session, job_hash: str, decision: Dict[str, Any]):
-    """
-    Salva decisão da IA no cache.
-
-    Args:
-        db: Sessão do SQLAlchemy
-        job_hash: Hash MD5 da descrição da vaga
-        decision: Decisão da IA em formato dict
-    """
-    import json
-
-    cache_entry = AICache(
-        job_description_hash=job_hash,
-        decision_json=json.dumps(decision, ensure_ascii=False),
-    )
-
-    db.add(cache_entry)
-    db.commit()
-
-
-def get_ai_cache(db: Session, job_hash: str) -> Optional[Dict[str, Any]]:
-    """
-    Busca decisão da IA no cache.
-
-    Args:
-        db: Sessão do SQLAlchemy
-        job_hash: Hash MD5 da descrição da vaga
-
-    Returns:
-        Decisão em formato dict ou None se não encontrado
-    """
-    import json
-
-    cache_entry = (
-        db.query(AICache).filter(AICache.job_description_hash == job_hash).first()
-    )
-
-    if cache_entry:
-        return json.loads(cache_entry.decision_json)
-
-    return None
 
 
 if __name__ == "__main__":
