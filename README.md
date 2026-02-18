@@ -42,7 +42,6 @@ curriculo-automatizado/
 │   └── main.py                  # Script Legacy (depreciado)
 ├── templates/
 │   └── base_template.docx       # Template Jinja2 para o currículo
-├── migrate_json_to_sqlite.py    # Script de migração JSON → SQLite
 ├── output/                      # Diretório de saída dos currículos gerados
 ├── logs/                        # Logs de migração e operações
 ├── .env                         # Variáveis de ambiente (API Keys)
@@ -93,11 +92,6 @@ O navegador abrirá automaticamente em `http://localhost:8501`. Cole a descriç�
 
 > **Nota**: O sistema utiliza exclusivamente o modelo **Gemini 2.5 Flash** para máxima confiabilidade e performance.
 
-### Verificação de Modelos
-Para testar a conectividade com a API do Google:
-```bash
-python test_models.py
-```
 
 ## 🔄 Migração para SQLite
 
@@ -116,7 +110,6 @@ O banco SQLite (`curriculo.db`) contém 9 tabelas normalizadas:
 - `projects` - Portfólio de projetos  
 - `tech_stack` - Tecnologias por projeto
 - `summaries` - Resumos profissionais
-- `ai_cache` - Cache de decisões da IA
 - E mais...
 
 ## 📄 Licença
