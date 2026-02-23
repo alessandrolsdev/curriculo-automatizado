@@ -13,6 +13,13 @@ output/
 *.log
 *.pdf
 *.docx
+*.zip
+
+# Data (Sensitive user data)
+data/*.db
+data/*.json
+data/*.backup
+!data/.gitkeep
 
 # IDEs
 .vscode/

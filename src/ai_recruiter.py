@@ -1,25 +1,45 @@
 """
-Módulo de integração com IA (Gemini 2.5 Flash)
-Versão 8.2: ULTRA REFORÇADO - Validações Rígidas + i18n
+Nexus AI Recruiter — Engine V9.0
+=================================
+Melhorias sobre V8.2:
+  • LangGraph state-machine com retry automático por nó
+  • Limpeza agressiva de artefatos Markdown (**bold**, ""quotes"", etc.)
+  • Detecção de idioma em dois passos (heurística + LLM fallback)
+  • Suporte a template_type: "dev" | "support"
+  • Carta de apresentação com estrutura comprovada para TI
+  • Validações ultra-rígidas encapsuladas em helpers reutilizáveis
 """
 
 import os
 import json
 import re
-import hashlib
-from typing import Dict, Any, Optional
+from typing import Any, Dict, List, Optional, TypedDict
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
+from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 
 from database import SessionLocal, get_profile_data
-from translations import translate_experience, get_template_path
+from translations import translate_experience, get_template_path, get_soft_skills, get_labels
 
 load_dotenv()
 
-# Configurações
 MODEL_NAME = "gemini-2.5-flash"
 MAX_RETRIES = 3
+TEMPERATURE = 0.18
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
+def _llm() -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
+        model=MODEL_NAME,
+        temperature=TEMPERATURE,
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        max_retries=MAX_RETRIES,
+        request_timeout=90,
+    )
 
 
 def load_data() -> Dict[str, Any]:
@@ -28,22 +48,461 @@ def load_data() -> Dict[str, Any]:
 
 
 def clean_json_output(text: str) -> str:
-    """Limpeza robusta de JSON."""
+    """Remove wrappers Markdown do output da LLM antes de parsear JSON."""
     if isinstance(text, list):
         text = str(text[0])
     if not isinstance(text, str):
         text = str(text)
-
-    text = re.sub(r"```json\s*", "", text)
-    text = re.sub(r"```", "", text)
-
+    text = re.sub(r"```json\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"```\s*", "", text)
     start = text.find("{")
     end = text.rfind("}") + 1
-
-    if start != -1 and end != 0:
+    if start != -1 and end > 0:
         return text[start:end].strip()
     return text.strip()
 
+
+# ── Text sanitisation ───────────────────────────────────────────────────────
+
+_FORBIDDEN_PAIRS: List[tuple] = [
+    # corporativês PT
+    ("sólida base",           "base"),
+    ("sólido conhecimento",   "conhecimento"),
+    ("se destaca",            ""),
+    ("se destaca pela",       ""),
+    ("expertise em",          "experiência em"),
+    ("expertise in",          "experience in"),
+    ("proficiente em",        "com conhecimento em"),
+    ("proficient in",         "with knowledge of"),
+    ("capacidade analítica",  "raciocínio lógico"),
+    ("analytical capacity",   "logical reasoning"),
+    ("evidenciando",          "demonstrando"),
+    ("evidencing",            "demonstrating"),
+    ("garantindo",            "com"),
+    ("ensuring",              "with"),
+    ("otimizando",            "melhorando"),
+    ("optimizing",            "improving"),
+    ("habilidades sólidas",   "habilidades"),
+    ("solid background",      "background"),
+    ("stands out",            ""),
+    ("extensive experience",  "experience"),
+    ("vasta experiência",     "experiência"),
+    ("apaixonado por",        "focado em"),
+    ("passionate about",      "focused on"),
+    ("seria uma honra",       ""),
+    ("would be an honor",     ""),
+    ("venho por meio desta",  ""),
+    ("through this message",  ""),
+]
+
+_MARKDOWN_ARTIFACTS = [
+    # bold/italic markdown que vaza no texto
+    (r"\*\*(.+?)\*\*", r"\1"),
+    (r"\*(.+?)\*",     r"\1"),
+    (r"__(.+?)__",     r"\1"),
+    (r"_(.+?)_",       r"\1"),
+    # aspas tipográficas mal formadas consecutivas
+    (r'"{2,}',         '"'),
+    (r"'{2,}",         "'"),
+    # traços extras
+    (r"—{2,}",         "—"),
+    # espaços duplos
+    (r" {2,}",         " "),
+    # newlines múltiplas dentro de strings JSON
+    (r"\n{3,}",        "\n\n"),
+]
+
+
+def sanitise_text(text: str) -> str:
+    """Remove artefatos Markdown e linguagem corporativa proibida."""
+    if not text:
+        return text
+
+    # 1. Markdown artifacts
+    for pattern, replacement in _MARKDOWN_ARTIFACTS:
+        text = re.sub(pattern, replacement, text)
+
+    # 2. Frases proibidas (case-insensitive)
+    for forbidden, replacement in _FORBIDDEN_PAIRS:
+        if forbidden.lower() in text.lower():
+            pattern = re.compile(re.escape(forbidden), re.IGNORECASE)
+            text = pattern.sub(replacement, text)
+
+    # 3. Espaços antes de pontuação
+    text = re.sub(r"\s+([.,;:!?])", r"\1", text)
+    text = re.sub(r" {2,}", " ", text)
+
+    return text.strip()
+
+
+def sanitise_decision(decision: Dict[str, Any]) -> Dict[str, Any]:
+    """Aplica sanitise_text em todos os campos textuais do decision dict."""
+    if "custom_summary" in decision:
+        decision["custom_summary"] = sanitise_text(decision["custom_summary"])
+
+    if "adapted_role_title" in decision:
+        decision["adapted_role_title"] = sanitise_text(decision["adapted_role_title"])
+
+    if "custom_projects" in decision:
+        for proj in decision["custom_projects"]:
+            for field in ("adapted_title", "adapted_description", "tech_display"):
+                if field in proj:
+                    proj[field] = sanitise_text(proj[field])
+
+    if "skills_categorized" in decision:
+        cleaned = {}
+        for cat, skills in decision["skills_categorized"].items():
+            cleaned[sanitise_text(cat)] = [sanitise_text(s) for s in skills]
+        decision["skills_categorized"] = cleaned
+
+    return decision
+
+
+# ── Language detection ───────────────────────────────────────────────────────
+
+_PT_KEYWORDS = [
+    "buscamos", "requisitos", "será responsável", "empresa", "empresa de",
+    "candidato", "vaga", "cargo", "benefícios", "contratação", "salário",
+    "estágio", "ensino", "formação", "obrigatório", "desejável",
+]
+_EN_KEYWORDS = [
+    "we are looking", "requirements", "responsibilities", "you will",
+    "experience with", "must have", "nice to have", "salary", "benefits",
+    "apply", "qualifications", "role", "position", "team", "join us",
+]
+
+
+def detect_language_heuristic(text: str) -> Optional[str]:
+    """
+    Detecção de idioma por contagem de keywords.
+    Retorna 'pt-BR', 'en-US' ou None se inconclusivo.
+    """
+    lower = text.lower()
+    pt_score = sum(1 for kw in _PT_KEYWORDS if kw in lower)
+    en_score = sum(1 for kw in _EN_KEYWORDS if kw in lower)
+
+    total = pt_score + en_score
+    if total == 0:
+        return None
+    ratio = max(pt_score, en_score) / total
+    if ratio >= 0.65:
+        return "pt-BR" if pt_score >= en_score else "en-US"
+    return None
+
+
+# ── LangGraph State ─────────────────────────────────────────────────────────
+
+class ResumeState(TypedDict):
+    job_description: str
+    master_data: Dict[str, Any]
+    force_language: Optional[str]
+    template_type: str                   # "dev" | "support"
+    job_title: Optional[str]
+    company_name: Optional[str]
+    detected_language: Optional[str]
+    raw_decision: Optional[Dict[str, Any]]
+    final_decision: Optional[Dict[str, Any]]
+    error: Optional[str]
+    retry_count: int
+
+
+# ── Graph Nodes ──────────────────────────────────────────────────────────────
+
+def node_detect_language(state: ResumeState) -> ResumeState:
+    lang = state.get("force_language")
+    if lang:
+        print(f"🌍 Idioma FORÇADO: {lang}")
+        return {**state, "detected_language": lang}
+
+    heuristic = detect_language_heuristic(state["job_description"])
+    if heuristic:
+        print(f"🌍 Idioma detectado (heurística): {heuristic}")
+        return {**state, "detected_language": heuristic}
+
+    # Fallback LLM
+    llm = _llm()
+    prompt = ChatPromptTemplate.from_template(
+        "Analyze the dominant language of this job description.\n"
+        "Reply ONLY with 'pt-BR' or 'en-US'.\n\n{text}"
+    )
+    chain = prompt | llm
+    result = chain.invoke({"text": state["job_description"][:800]})
+    lang = result.content.strip().replace('"', "").replace("'", "")
+    if "en" in lang.lower():
+        lang = "en-US"
+    else:
+        lang = "pt-BR"
+    print(f"🌍 Idioma detectado (LLM fallback): {lang}")
+    return {**state, "detected_language": lang}
+
+
+def node_call_ai(state: ResumeState) -> ResumeState:
+    """Chama a LLM e retorna o decision dict bruto."""
+    lang = state["detected_language"] or "pt-BR"
+    template_type = state.get("template_type", "dev")
+    is_en = lang == "en-US"
+
+    # Instruções de idioma
+    lang_instr = f"⚠️ MANDATORY LANGUAGE: {lang}. ALL text must be in {'English' if is_en else 'Portuguese (Brazil)'}."
+
+    # Contexto da vaga
+    ctx_parts = []
+    if state.get("job_title"):
+        ctx_parts.append(f"JOB TITLE: {state['job_title']}")
+    if state.get("company_name"):
+        ctx_parts.append(f"COMPANY: {state['company_name']}")
+    job_ctx = "\n".join(ctx_parts)
+
+    # Instruções de tipo de template
+    if template_type == "support":
+        type_instr = (
+            "This is a SUPPORT / HELP DESK / IT role.\n"
+            "PRIORITIZE: communication, troubleshooting, ITSM, Azure, customer service.\n"
+            "PROJECTS: choose AutoScan (RPA), Nexus AI Recruiter (automation), Clutch (troubleshooting).\n"
+            "SKILLS: include a 'Suporte & Comunicação' / 'Support & Communication' category.\n"
+        )
+    else:
+        type_instr = (
+            "This is a DEVELOPER role.\n"
+            "PRIORITIZE: technical stack, architecture, backend/frontend based on job description.\n"
+            "Select the 3 most relevant projects from the portfolio.\n"
+        )
+
+    prompt_template = ChatPromptTemplate.from_template(
+        """YOU ARE WRITING ABOUT YOURSELF. You ARE Alessandro. Write YOUR resume.
+NEVER use 3rd person. NEVER say "Alessandro" mid-sentence.
+
+═══════════════════════════════════════════════════════
+INVIOLABLE RULES — VIOLATION = AUTOMATIC FAILURE
+═══════════════════════════════════════════════════════
+
+1. NO 3RD PERSON:
+   ❌ "Alessandro stands out" | "Alessandro has" | "Alessandro Lima da Silva"
+   ✅ Start directly: "Software Engineering student..."
+
+2. BANNED PHRASES (auto-replaced post-generation, so avoid them):
+   ❌ "sólida base" | "se destaca" | "expertise" | "proficiente"
+   ❌ "capacidade analítica" | "evidenciando" | "garantindo" | "otimizando"
+   ❌ "solid background" | "stands out" | "extensive experience" | "passionate about"
+
+3. NO MARKDOWN in output text values:
+   ❌ **bold** | *italic* | __underline__ | ""double quotes"" stacked
+   ✅ Plain text only in all string values
+
+4. SUMMARY: ONE paragraph, 400–550 characters
+   Structure: [Degree + real experience] + [concrete skills] + [fit for THIS role]
+
+5. PROJECTS: ALWAYS honest — these are learning/study projects
+   ✅ "Project to learn X: implemented Y with Z. Gained: skill. Stack: A, B, C."
+   ❌ "ensuring decoupling" | "optimizing foundation" | "evidencing ability"
+
+═══════════════════════════════════════════════════════
+INPUTS
+═══════════════════════════════════════════════════════
+
+JOB DESCRIPTION:
+{job_description}
+
+{job_context}
+
+PROFILE DATA:
+{master_data}
+
+LANGUAGE INSTRUCTION:
+{lang_instruction}
+
+TEMPLATE TYPE INSTRUCTIONS:
+{type_instruction}
+
+═══════════════════════════════════════════════════════
+SUMMARY STRUCTURE (MANDATORY):
+═══════════════════════════════════════════════════════
+
+LINE 1: Degree + real experience (Azure tech support)
+LINE 2: Transition to dev/skill focus (Python, last 8 months)
+LINE 3: Specific fit for THIS job
+
+❌ WRONG: "Alessandro possui sólida base em..."
+✅ CORRECT: "Software Engineering student (graduation 03/2026) with 2+ years in technical support (Azure, troubleshooting, ITSM). Transitioned to Python development 8 months ago. This background gives me clear communication, logical reasoning, and incident management — valuable for [specific fit]."
+
+SIZE: 400–550 chars. COUNT before returning.
+
+═══════════════════════════════════════════════════════
+PROJECTS (EXACTLY 3):
+═══════════════════════════════════════════════════════
+
+{type_instruction}
+
+FORMAT:
+"Project to [learn X]: implemented [Y] using [techs]. Result: mastery of [skill]. Stack: A, B, C."
+
+═══════════════════════════════════════════════════════
+OUTPUT JSON (strict):
+═══════════════════════════════════════════════════════
+
+{{
+  "language_code": "{lang_code}",
+  "adapted_role_title": "Title | Stack + Differentiator",
+  "custom_summary": "One paragraph, 400-550 chars, no markdown...",
+  "skills_categorized": {{
+    "Category1": ["skill1", "skill2"],
+    "Category2": ["skill3", "skill4"]
+  }},
+  "custom_projects": [
+    {{
+      "original_id": "project-id",
+      "adapted_title": "Project Title",
+      "adapted_description": "Project to learn X: implemented Y...",
+      "tech_display": "Tech1 | Tech2 | Tech3"
+    }}
+  ],
+  "highlighted_techs": ["Tech1", "Tech2"],
+  "project_selection_reasoning": "I chose these 3 because..."
+}}
+
+CHECKLIST before returning:
+[ ] No "Alessandro" in summary mid-sentence?
+[ ] No banned phrases?
+[ ] Summary is ONE paragraph, 400-550 chars?
+[ ] No **markdown** in text values?
+[ ] Exactly 3 projects?
+[ ] All in correct language: {lang_code}?
+
+If ANY = NO → REWRITE until all = YES.
+"""
+    )
+
+    llm = _llm()
+    chain = prompt_template | llm
+
+    response = chain.invoke({
+        "job_description": state["job_description"],
+        "job_context": job_ctx,
+        "master_data": json.dumps(state["master_data"], ensure_ascii=False, indent=2),
+        "lang_instruction": lang_instr,
+        "type_instruction": type_instr,
+        "lang_code": lang,
+    })
+
+    try:
+        cleaned = clean_json_output(response.content)
+        decision = json.loads(cleaned)
+        return {**state, "raw_decision": decision, "error": None}
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON parse error: {e}")
+        return {**state, "raw_decision": None, "error": str(e), "retry_count": state.get("retry_count", 0) + 1}
+
+
+def node_validate(state: ResumeState) -> ResumeState:
+    """Valida e corrige o decision dict."""
+    decision = state.get("raw_decision")
+    lang = state.get("detected_language", "pt-BR")
+
+    if not decision:
+        return {**state, "error": "raw_decision is None after LLM call."}
+
+    # Force language
+    decision["language_code"] = lang
+
+    # ── Sanitise all text fields ──────────────────────────────────────────
+    decision = sanitise_decision(decision)
+
+    # ── Summary validation ────────────────────────────────────────────────
+    summary = decision.get("custom_summary", "")
+
+    # Remove multiple paragraphs → join into one
+    if "\n\n" in summary or "\n" in summary:
+        summary = re.sub(r"\s*\n+\s*", " ", summary).strip()
+
+    # Remove "Alessandro" at start
+    summary = re.sub(r"^Alessandro\s+Lima\s+da\s+Silva[,.]?\s*", "", summary, flags=re.IGNORECASE)
+    summary = re.sub(r"^Alessandro[,.]?\s+", "", summary, flags=re.IGNORECASE)
+
+    # Length warning
+    if len(summary) > 600:
+        print(f"⚠️  Summary long ({len(summary)} chars). Truncating at last full sentence ≤600.")
+        # Truncate at last sentence boundary
+        truncated = summary[:600]
+        last_period = max(truncated.rfind("."), truncated.rfind("!"), truncated.rfind("?"))
+        if last_period > 400:
+            summary = truncated[:last_period + 1].strip()
+        else:
+            summary = truncated.strip()
+
+    decision["custom_summary"] = summary
+
+    # ── Projects validation ────────────────────────────────────────────────
+    projects = decision.get("custom_projects", [])
+    if not projects:
+        return {**state, "error": "AI failed to generate projects.", "retry_count": state.get("retry_count", 0) + 1}
+
+    if len(projects) > 3:
+        print(f"⚠️  Limiting {len(projects)} → 3 projects")
+        projects = projects[:3]
+    elif len(projects) < 3:
+        print(f"⚠️  Only {len(projects)} project(s) returned (expected 3)")
+
+    decision["custom_projects"] = projects
+
+    # ── Ensure skills dict has at least one category ───────────────────────
+    if not decision.get("skills_categorized"):
+        decision["skills_categorized"] = {
+            "Tecnologias": state["master_data"]["profile"].get("hard_skills", [])[:8]
+        }
+
+    summary_len = len(decision.get("custom_summary", ""))
+    proj_count = len(decision.get("custom_projects", []))
+    print(f"✅ V9 {lang} | {proj_count} projects | {summary_len} chars summary")
+
+    return {**state, "final_decision": decision, "error": None}
+
+
+def node_retry_check(state: ResumeState) -> str:
+    """Decide se deve retry ou encerrar com erro."""
+    if state.get("error") and state.get("retry_count", 0) < 2:
+        print(f"🔄 Retrying... ({state['retry_count']}/2)")
+        return "retry"
+    if state.get("error"):
+        return "fail"
+    return "done"
+
+
+# ── Build LangGraph ──────────────────────────────────────────────────────────
+
+def _build_graph() -> Any:
+    graph = StateGraph(ResumeState)
+
+    graph.add_node("detect_language", node_detect_language)
+    graph.add_node("call_ai", node_call_ai)
+    graph.add_node("validate", node_validate)
+
+    graph.set_entry_point("detect_language")
+    graph.add_edge("detect_language", "call_ai")
+    graph.add_edge("call_ai", "validate")
+    graph.add_conditional_edges(
+        "validate",
+        node_retry_check,
+        {
+            "retry": "call_ai",
+            "done": END,
+            "fail": END,
+        },
+    )
+
+    return graph.compile()
+
+
+_RESUME_GRAPH = None
+
+
+def get_resume_graph():
+    global _RESUME_GRAPH
+    if _RESUME_GRAPH is None:
+        _RESUME_GRAPH = _build_graph()
+    return _RESUME_GRAPH
+
+
+# ── Public API ───────────────────────────────────────────────────────────────
 
 def get_ai_decision(
     job_description: str,
@@ -51,382 +510,112 @@ def get_ai_decision(
     force_language: Optional[str] = None,
     job_title: Optional[str] = None,
     company_name: Optional[str] = None,
+    template_type: str = "dev",
 ) -> Dict[str, Any]:
     """
-    Engine V8.2: i18n + Strategic Selection + Validações ULTRA-RÍGIDAS
+    Engine V9: LangGraph + Ultra-Validations + i18n.
 
     Args:
-        job_description: Descrição da vaga
-        master_data: Dados do perfil
-        force_language: Força idioma ("pt-BR" ou "en-US"). Se None, detecta.
-        job_title: Título da vaga (ex: "Backend Developer", "Technical Support")
-        company_name: Nome da empresa (ex: "Lenovo", "Google")
+        job_description : Texto completo da vaga.
+        master_data     : Dados do perfil (do banco).
+        force_language  : 'pt-BR' | 'en-US' | None (auto-detect).
+        job_title       : Título da vaga (opcional, melhora precisão).
+        company_name    : Nome da empresa (opcional).
+        template_type   : 'dev' | 'support'.
+
+    Returns:
+        Dict com campos: language_code, adapted_role_title, custom_summary,
+                         skills_categorized, custom_projects, highlighted_techs,
+                         project_selection_reasoning.
     """
-    # Prepara instruções de idioma forçado
-    lang_instruction = ""
-    if force_language:
-        lang_instruction = f"\n⚠️ IDIOMA FORÇADO: Use OBRIGATORIAMENTE language_code: '{force_language}'"
-        print(f"🌍 Idioma FORÇADO: {force_language}")
-    else:
-        print(f"🌍 Engine V8.2 (Auto-Detect + Ultra-Validations)")
+    graph = get_resume_graph()
 
-    # Prepara contexto adicional
-    job_context = ""
-    if job_title:
-        job_context += f"\n📌 TÍTULO DA VAGA: {job_title}"
-    if company_name:
-        job_context += f"\n🏢 EMPRESA: {company_name}"
+    initial_state: ResumeState = {
+        "job_description": job_description,
+        "master_data": master_data,
+        "force_language": force_language,
+        "template_type": template_type,
+        "job_title": job_title,
+        "company_name": company_name,
+        "detected_language": None,
+        "raw_decision": None,
+        "final_decision": None,
+        "error": None,
+        "retry_count": 0,
+    }
 
-    # ==============================================================================
-    # 🎯 PROMPT V8.2 - ULTRA REFORÇADO
-    # ==============================================================================
-    prompt_template = ChatPromptTemplate.from_template(
-        """VOCÊ É ALESSANDRO. Escreva SEU currículo. NÃO fale SOBRE Alessandro.
+    result = graph.invoke(initial_state)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ REGRAS INVIOLÁVEIS - VIOLAÇÃO = FALHA AUTOMÁTICA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if result.get("error") or not result.get("final_decision"):
+        raise RuntimeError(f"AI Engine V9 failed: {result.get('error', 'Unknown error')}")
 
-1. NUNCA 3ª pessoa:
-   ❌ "Alessandro se destaca" | "Alessandro possui" | "Alessandro Lima da Silva"
-   ✅ Comece direto: "Estudante de Engenharia..."
-
-2. FRASES 100% PROIBIDAS:
-   ❌ "sólida base" | "se destaca" | "expertise" | "proficiente"
-   ❌ "capacidade analítica" | "evidenciando" | "garantindo" | "otimizando"
-   ❌ "solid background" | "stands out" | "extensive experience"
-
-3. SUMÁRIO: UM parágrafo, MAX 550 chars
-   Estrutura: [Formação + Experiência real] + [Skills concretas] + [Fit para vaga]
-
-4. PROJETOS: SEMPRE honesto sobre serem de estudo
-   ✅ "Projeto para aprender X: implementei Y. Domínio de Z."
-   ❌ "garantindo desacoplamento" | "otimizando fundação"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📥 INPUTS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VAGA: {job_description}{job_context}
-
-MEU HISTÓRICO: {master_data}
-
-🌍 IDIOMA:{force_language_instruction}
-Analise idioma PREDOMINANTE da vaga:
-- >70% INGLÊS → "en-US"
-- >70% PORTUGUÊS → "pt-BR"
-Keywords PT: "Buscamos", "requisitos", "será responsável"
-Keywords EN: "We are looking", "requirements", "responsibilities"
-
-⚠️ TODO conteúdo no MESMO idioma.
-⚠️ SE FOR FORÇADO, USE O IDIOMA FORÇADO.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📝 SUMÁRIO (ESTRUTURA OBRIGATÓRIA):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-LINHA 1: Formação + Experiência real (suporte técnico Azure)
-LINHA 2: Transição para desenvolvimento (Python, últimos 8 meses)
-LINHA 3: Diferencial para ESSA vaga específica
-
-❌ EXEMPLO ERRADO (3ª pessoa, corporativo):
-"Engenheiro de Software com sólida base, Alessandro se destaca pela capacidade..."
-
-✅ EXEMPLO CORRETO (direto, específico):
-"Estudante de Engenharia de Software (formatura 03/2026) com 2+ anos em suporte técnico (Azure, troubleshooting, atendimento). Migrei para desenvolvimento Python nos últimos 8 meses. Esse background me deu comunicação clara, raciocínio lógico para resolver problemas e experiência com gestão de incidentes - essencial para [inserir fit com a vaga]."
-
-TAMANHO: 400-550 chars. CONTE: ___ (preencha antes de retornar)
-
-⚠️ Se >550 chars → DELETE adjetivos/redundâncias.
-⚠️ Se múltiplos parágrafos → UNA em 1.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 PROJETOS (EXATAMENTE 3):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ESCOLHA baseado no TIPO de vaga:
-
-📱 Frontend → Interactive Portfolio, Relay Flow, Pokédex
-🔧 Backend → SaaS Mestre, RPG Task, NOMAD, CLUTCH
-🌐 Fullstack → Arena Iron Beach, NOMAD, Banco New
-🛠️ DevOps/Infra → AutoScan (automação), projetos com Docker
-👨‍💼 Suporte Técnico → AutoScan (RPA), SaaS (Python), Clutch (troubleshooting)
-
-FORMATO OBRIGATÓRIO:
-"Projeto para [aprender X]: implementei [Y] com [techs]. Resultado: domínio de [skill]. Stack: A, B, C."
-
-❌ PROIBIDO:
-"garantindo desacoplamento" | "otimizando fundação" | "evidenciando habilidade"
-
-✅ EXEMPLOS:
-"Projeto para aprender automação: criei bot RPA com Python, OCR e Regex. Resultado: domínio de troubleshooting de pipelines. Stack: Python, Tesseract, Pandas."
-
-"Projeto para praticar Clean Architecture: implementei API FastAPI com OAuth2. Resultado: domínio de arquitetura escalável. Stack: FastAPI, SQLAlchemy, Docker."
-
-TAMANHO: 250-350 chars/projeto.
-ANTES DE RETORNAR: CONTE projetos. Se >3 → DELETE até sobrar 3.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 SKILLS (CATEGORIAS CORRETAS):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Use ESTAS categorias (não invente):
-
-Para vaga de DESENVOLVEDOR:
-- "Linguagens": Python, JavaScript, TypeScript, Bash
-- "Backend": FastAPI, NestJS, Django
-- "Frontend": React, Next.js, Vue.js
-- "Bancos de Dados": PostgreSQL, MongoDB, Redis
-- "DevOps & Cloud": Docker, Git, CI/CD, Azure
-
-Para vaga de SUPORTE/HELP DESK:
-- "Suporte & Comunicação": Atendimento ao Cliente, Chat/Telefone, Troubleshooting
-- "Conhecimento Técnico": Python (Básico), Bash, Linux, Azure
-- "Ferramentas": Jira, Confluence, Ticketing Systems
-
-⚠️ PRIORIZE skills da vaga (coloque primeiro).
-❌ NÃO invente skills fora do histórico.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📤 OUTPUT JSON:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{{
-  "language_code": "pt-BR",
-  "adapted_role_title": "Cargo | Stack + Diferencial",
-  "custom_summary": "Texto 400-550 chars, 1 parágrafo...",
-  "skills_categorized": {{
-    "Categoria1": ["skill1", "skill2"],
-    "Categoria2": ["skill3", "skill4"]
-  }},
-  "custom_projects": [
-    {{
-      "original_id": "project-id",
-      "adapted_title": "Título do Projeto",
-      "adapted_description": "Projeto para aprender X...",
-      "tech_display": "Tech1 | Tech2 | Tech3"
-    }}
-    // EXATAMENTE 3 projetos
-  ],
-  "highlighted_techs": ["Tech1", "Tech2"],
-  "project_selection_reasoning": "Escolhi esses 3 porque..."
-}}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧠 CHECKLIST OBRIGATÓRIO (preencha ANTES de retornar):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[ ] Sumário NÃO tem "Alessandro" no meio do texto?
-[ ] Sumário NÃO tem "sólida base", "se destaca", "expertise"?
-[ ] Sumário tem 400-550 chars? (conte: ___ chars)
-[ ] Sumário é UM parágrafo (sem múltiplas quebras)?
-[ ] Projetos começam com "Projeto para..." ou "Construí para..."?
-[ ] Projetos NÃO têm "garantindo", "otimizando", "evidenciando"?
-[ ] Tenho EXATAMENTE 3 projetos (não 2, não 4)?
-[ ] Skills são do histórico real (não inventadas)?
-[ ] Idioma está correto?
-
-Se QUALQUER = NÃO → REESCREVA até todos = SIM.
-
-Agora crie o currículo autêntico.
-"""
-    )
-
-    try:
-        llm = ChatGoogleGenerativeAI(
-            model=MODEL_NAME,
-            temperature=0.20,  # 🆕 Reduzido de 0.25 para 0.20 (mais conservador)
-            google_api_key=os.getenv("GOOGLE_API_KEY"),
-            max_retries=MAX_RETRIES,
-            request_timeout=60,
-        )
-
-        chain = prompt_template | llm
-
-        response = chain.invoke(
-            {
-                "job_description": job_description,
-                "master_data": json.dumps(master_data, ensure_ascii=False),
-                "force_language_instruction": lang_instruction,
-                "job_context": job_context,
-            }
-        )
-
-        content = response.content
-        cleaned_json = clean_json_output(content)
-        decision = json.loads(cleaned_json)
-
-        # ========== VALIDAÇÃO V8.2 ULTRA-RÍGIDA ==========
-
-        # Validação 1: Idioma obrigatório
-        if "language_code" not in decision:
-            print("⚠️ language_code ausente, assumindo pt-BR")
-            decision["language_code"] = "pt-BR"
-
-        # Se forçou, sobrescreve
-        if force_language:
-            decision["language_code"] = force_language
-            print(f"✅ Idioma forçado: {force_language}")
-
-        # Validação 2: Remover 3ª pessoa e frases proibidas do sumário
-        if "custom_summary" in decision:
-            summary = decision["custom_summary"]
-            original_len = len(summary)
-
-            # Remove nome completo
-            summary = re.sub(
-                r"Alessandro Lima da Silva\s+", "", summary, flags=re.IGNORECASE
-            )
-            summary = re.sub(
-                r"Alessandro\s+(se |possui |tem |é |stands out|has )",
-                "",
-                summary,
-                flags=re.IGNORECASE,
-            )
-
-            # Remove frases proibidas
-            forbidden_replacements = {
-                "sólida base": "base",
-                "solid background": "background",
-                "se destaca": "",
-                "stands out": "",
-                "expertise em": "experiência em",
-                "expertise in": "experience in",
-                "proficiente em": "conhecimento em",
-                "proficient in": "knowledge in",
-                "capacidade analítica": "raciocínio lógico",
-                "analytical capacity": "logical reasoning",
-                "evidenciando": "mostrando",
-                "evidencing": "showing",
-                "garantindo": "com",
-                "ensuring": "with",
-                "otimizando": "melhorando",
-                "optimizing": "improving",
-            }
-
-            for forbidden, replacement in forbidden_replacements.items():
-                if forbidden in summary.lower():
-                    print(f"⚠️ Removendo: '{forbidden}'")
-                    pattern = re.compile(re.escape(forbidden), re.IGNORECASE)
-                    summary = pattern.sub(replacement, summary)
-
-            # Remove espaços duplos
-            summary = re.sub(r"\s+", " ", summary).strip()
-            decision["custom_summary"] = summary
-
-            if len(summary) != original_len:
-                print(f"✅ Sumário corrigido: {original_len} → {len(summary)} chars")
-
-        # Validação 3: Limitar a EXATAMENTE 3 projetos
-        if "custom_projects" in decision:
-            proj_count = len(decision["custom_projects"])
-            if proj_count > 3:
-                print(f"⚠️ Limitando {proj_count} → 3 projetos")
-                decision["custom_projects"] = decision["custom_projects"][:3]
-            elif proj_count < 3:
-                print(f"⚠️ Apenas {proj_count} projetos (esperado: 3)")
-        else:
-            raise ValueError("IA falhou em gerar projetos.")
-
-        # Validação 4: Unificar múltiplos parágrafos
-        if "custom_summary" in decision:
-            summary = decision["custom_summary"]
-            if "\n\n" in summary:
-                print(f"⚠️ Unificando múltiplos parágrafos...")
-                summary = summary.replace("\n\n", " ").replace("\n", " ").strip()
-                decision["custom_summary"] = summary
-
-        # Validação 5: Verificar linguagem corporativa em projetos
-        if "custom_projects" in decision:
-            corporate_words = [
-                "garantindo",
-                "otimizando",
-                "evidenciando",
-                "capacitando",
-                "ensuring",
-                "optimizing",
-                "evidencing",
-            ]
-            for i, proj in enumerate(decision["custom_projects"]):
-                desc = proj.get("adapted_description", "").lower()
-                found = [w for w in corporate_words if w in desc]
-                if found:
-                    print(f"⚠️ Projeto {i+1} tem linguagem corporativa: {found}")
-
-        # Avisos finais
-        summary_len = len(decision.get("custom_summary", ""))
-        if summary_len > 600:
-            print(f"⚠️ Sumário longo ({summary_len} chars). Ideal: 400-550.")
-
-        lang_flag = "🇧🇷" if decision["language_code"] == "pt-BR" else "🇺🇸"
-        print(
-            f"✅ V8.2 {lang_flag} | {len(decision.get('custom_projects', []))} projetos | {summary_len} chars"
-        )
-
-        return decision
-
-    except Exception as e:
-        print(f"❌ Erro: {str(e)}")
-        raise e
+    return result["final_decision"]
 
 
 def build_context_from_decision(
-    decision: Dict[str, Any], master_data: Dict[str, Any]
+    decision: Dict[str, Any],
+    master_data: Dict[str, Any],
+    template_type: str = "dev",
 ) -> Dict[str, Any]:
-    """Monta contexto com traduções i18n."""
-
+    """Monta o contexto Jinja2 completo para renderização do template."""
     language_code = decision.get("language_code", "pt-BR")
+    labels = get_labels(language_code)
 
-    # 1. Título e Resumo
-    role_title = decision.get("adapted_role_title", "Desenvolvedor Full Stack")
-    summary_text = decision.get("custom_summary", master_data["summaries"]["fullstack"])
+    # Projetos
+    selected_projects = [
+        {
+            "name": p["adapted_title"],
+            "techs": p["tech_display"],
+            "description": p["adapted_description"],
+        }
+        for p in decision.get("custom_projects", [])
+    ]
 
-    # 2. Projetos
-    selected_projects = []
-    if "custom_projects" in decision:
-        for proj in decision["custom_projects"]:
-            selected_projects.append(
-                {
-                    "name": proj["adapted_title"],
-                    "techs": proj["tech_display"],
-                    "description": proj["adapted_description"],
-                }
-            )
+    # Skills
+    skills_formatted = [
+        {"name": cat, "list": " • ".join(skills)}
+        for cat, skills in decision.get("skills_categorized", {}).items()
+        if skills
+    ]
 
-    # 3. Skills
-    skills_formatted = []
-    if "skills_categorized" in decision:
-        for cat_name, skills_list in decision["skills_categorized"].items():
-            if skills_list:
-                skills_formatted.append(
-                    {"name": cat_name, "list": " • ".join(skills_list)}
-                )
+    # Soft skills (apenas para templates de suporte)
+    soft_skills = get_soft_skills(language_code) if template_type == "support" else []
 
-    # 4. Experiência TRADUZIDA
-    experience_translated = translate_experience(language_code)
+    # Experiência traduzida
+    experience = translate_experience(language_code)
 
-    # 5. Template dinâmico
-    template_path = get_template_path(language_code)
+    # Template path
+    template_path = get_template_path(language_code, template_type)
 
     return {
+        # Perfil
         "name": master_data["profile"]["name"],
-        "role_title": role_title,
+        "role_title": decision.get("adapted_role_title", "Desenvolvedor Full Stack"),
         "location": master_data["profile"]["contact"]["location"],
         "phone": master_data["profile"]["contact"]["phone"],
         "email": master_data["profile"]["contact"]["email"],
         "linkedin": master_data["profile"]["contact"]["linkedin"],
         "github": master_data["profile"]["contact"]["github"],
-        "summary": summary_text,
+        # Conteúdo adaptado
+        "summary": decision.get("custom_summary", ""),
         "skills": skills_formatted,
+        "soft_skills": soft_skills,
         "selected_projects": selected_projects,
         "highlighted_techs": decision.get("highlighted_techs", []),
+        # Dados fixos
         "education": master_data["profile"]["education"],
         "languages": master_data["profile"]["languages"],
-        "experience": experience_translated,
+        "experience": experience,
+        # Meta
         "language_code": language_code,
         "template_path": template_path,
+        "template_type": template_type,
+        # Labels i18n
+        "labels": labels,
     }
 
+
+# ── Cover Letter Engine ─────────────────────────────────────────────────────
 
 def generate_cover_letter(
     job_description: str,
@@ -435,89 +624,114 @@ def generate_cover_letter(
     job_title: Optional[str] = None,
     company_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Gera carta de apresentação humanizada."""
+    """
+    Gera carta de apresentação humanizada e otimizada para vagas de TI.
 
-    projects_list = "\n".join(
-        [
-            f"- {p['id']}: {p['title']} ({', '.join(p['tech_stack'][:5])})"
-            for p in master_data["projects"]
-        ]
-    )
+    Estrutura comprovada (Nação):
+      1. Hook   — conexão imediata com a vaga
+      2. Contexto — trajetória (suporte → dev)
+      3. Prova  — 2–3 projetos relevantes com resultado
+      4. Fit    — por que eu + empresa
+      5. CTA    — objetivo e disponibilidade
 
-    is_english = language_code == "en-US"
-    greeting = "Hi!" if is_english else "Oi!"
-    closing = "Best regards,\nAlessandro" if is_english else "Abraço,\nAlessandro"
-    language = "ENGLISH" if is_english else "PORTUGUÊS"
+    Returns: { subject_line, email_body, word_count }
+    """
+    is_en = language_code == "en-US"
 
-    # Contexto adicional
-    extra_context = ""
-    if job_title:
-        extra_context += f"\nTÍTULO DA VAGA: {job_title}"
-    if company_name:
-        extra_context += f"\nEMPRESA: {company_name}"
+    # Top 5 projects for context
+    projects_list = "\n".join([
+        f"- {p['id']}: {p['title']} ({', '.join(p['tech_stack'][:4])})"
+        for p in master_data["projects"][:10]
+    ])
+
+    company_clause = f" at {company_name}" if company_name else ""
+    role_clause = f"for the {job_title} role{company_clause}" if job_title else f"for this role{company_clause}"
+
+    if is_en:
+        lang_instruction = "Write 100% in English. Professional but conversational tone."
+        structure_hint = f"""STRUCTURE (apply {role_clause}):
+1. HOOK (1-2 sentences): "I came across this opening — it makes sense to apply. You need someone who [X]..."
+2. CONTEXT (2-3 sentences): Journey from Azure support → Python dev. Be specific about timeline.
+3. PROOF (2-3 bullets with **bold project names**):
+   • **Project Name** — What I built + concrete skill gained
+4. FIT (1-2 sentences): Why support background + dev skills = unique value for THIS company/role.
+5. CTA (1 sentence): Clear availability + call to action.
+
+CLOSING: "Best,\\nAlessandro"
+GREETING: "Hi{' ' + company_name if company_name else ''},"
+"""
+        banned = "BANNED: 'passionate about', 'it would be an honor', 'vast experience', 'through this message', 'highly motivated'"
+    else:
+        lang_instruction = "Escreva 100% em Português Brasileiro. Tom profissional mas conversacional."
+        structure_hint = f"""ESTRUTURA (aplique {role_clause}):
+1. GANCHO (1-2 frases): "Vi a vaga e faz sentido candidatar. Vocês precisam de alguém que [X]..."
+2. CONTEXTO (2-3 frases): Trajetória suporte Azure → Python dev. Seja específico com tempo.
+3. PROVA (2-3 bullets com **nomes em negrito**):
+   • **Nome do Projeto** — O que construí + skill concreta adquirida
+4. FIT (1-2 frases): Por que background em suporte + skills dev = valor único para ESTA empresa/vaga.
+5. CTA (1 frase): Disponibilidade clara + call to action.
+
+FECHAMENTO: "Abraço,\\nAlessandro"
+SAUDAÇÃO: "Oi{' ' + company_name if company_name else ''},"
+"""
+        banned = "PROIBIDO: 'apaixonado por', 'seria uma honra', 'vasta experiência', 'venho por meio desta', 'altamente motivado'"
 
     prompt_template = ChatPromptTemplate.from_template(
-        """Carta CURTA (180-250 palavras) para vaga.{extra_context}
+        """{lang_instruction}
 
-VAGA: {job_description}
-PROJETOS: {projects_list}
+{structure_hint}
 
-🚫 PROIBIDO:
-"Venho por meio desta", "apaixonado", "vasta experiência", "seria uma honra"
+{banned}
 
-✅ ESTRUTURA:
-1. Gancho: "Vi a vaga e faz sentido candidatar. Vocês precisam de X..."
-2. Contexto: "Comecei em suporte Azure, migrei para Python..."
-3. Prova: "• **Projeto A** – Skill X"
-4. Diferencial: "Background suporte = troubleshooting eficiente"
-5. CTA: "Disponibilidade total. Fico à disposição."
+LENGTH: 180-250 words (count before returning).
 
-SAUDAÇÃO: {greeting}
-FECHAMENTO: {closing}
-IDIOMA: {language}
+JOB DESCRIPTION:
+{job_description}
 
-OUTPUT JSON:
+AVAILABLE PROJECTS (select 2-3 most relevant):
+{projects_list}
+
+PROFILE CONTEXT:
+- Software Engineering student, graduation 03/2026
+- 3 years Azure IT support at Aegea Saneamento  
+- 8 months focused Python/AI development
+- Skills: Python, FastAPI, LangChain, Gemini API, React, Docker
+
+OUTPUT JSON (only JSON, no markdown wrapper):
 {{
-  "subject_line": "Cargo - Alessandro (Diferencial)",
-  "email_body": "Texto 180-250 palavras...",
+  "subject_line": "Role Title — Alessandro (Key Differentiator)",
+  "email_body": "Greeting\\n\\nBody text 180-250 words...\\n\\nClosing",
   "word_count": 200
 }}
 """
     )
 
-    try:
-        llm = ChatGoogleGenerativeAI(
-            model=MODEL_NAME,
-            temperature=0.3,
-            google_api_key=os.getenv("GOOGLE_API_KEY"),
-            max_retries=MAX_RETRIES,
-            request_timeout=60,
-        )
+    llm = ChatGoogleGenerativeAI(
+        model=MODEL_NAME,
+        temperature=0.28,
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        max_retries=MAX_RETRIES,
+        request_timeout=90,
+    )
 
-        chain = prompt_template | llm
+    chain = prompt_template | llm
+    response = chain.invoke({
+        "lang_instruction": lang_instruction,
+        "structure_hint": structure_hint,
+        "banned": banned,
+        "job_description": job_description[:3000],
+        "projects_list": projects_list,
+    })
 
-        response = chain.invoke(
-            {
-                "job_description": job_description,
-                "projects_list": projects_list,
-                "greeting": greeting,
-                "closing": closing,
-                "language": language,
-                "extra_context": extra_context,
-            }
-        )
+    cleaned = clean_json_output(response.content)
+    result = json.loads(cleaned)
 
-        content = response.content
-        cleaned_json = clean_json_output(content)
-        result = json.loads(cleaned_json)
+    if "email_body" not in result:
+        raise ValueError("AI failed to generate cover letter body.")
 
-        if "email_body" not in result:
-            raise ValueError("IA falhou em gerar corpo do email.")
+    # Sanitise the letter body too
+    result["email_body"] = sanitise_text(result["email_body"])
+    result["subject_line"] = sanitise_text(result.get("subject_line", ""))
 
-        print(f"✅ Cover Letter: {result.get('word_count', 0)} palavras")
-
-        return result
-
-    except Exception as e:
-        print(f"❌ Erro cover letter: {str(e)}")
-        raise e
+    print(f"✅ Cover Letter: {result.get('word_count', '?')} words | {language_code}")
+    return result

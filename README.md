@@ -1,7 +1,8 @@
-# Nexus AI Recruiter
+# Nexus AI Recruiter ⚡
 
-> Sistema Inteligente de Otimização e Geração de Currículos.
+> **Engine V9.0**: Otimização Inteligente de Currículos com LangGraph & Gemini 2.5 Flash.
 
+![Status](https://img.shields.io/badge/Status-Active-success)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.28%2B-red)
 ![Gemini AI](https://img.shields.io/badge/AI-Google%20Gemini-orange)
@@ -9,112 +10,101 @@
 
 ## 📋 Visão Geral
 
-O **Nexus AI Recruiter** é uma aplicação desenvolvida para automatizar e otimizar a personalização de currículos tech. Utilizando a API **Google Gemini Pro**, o sistema analisa descrições de vagas em tempo real e reestrutura o currículo do candidato para destacar as experiências, projetos e habilidades mais relevantes para aquela oportunidade específica.
+O **Nexus AI Recruiter** é uma ferramenta de "Hyper-Personalization" para processos seletivos de TI. Ele não apenas "edita" um currículo, mas **reescreve** a narrativa profissional do candidato para se alinhar matematicamente com a descrição da vaga (JD), utilizando uma arquitetura de agentes (LangGraph) e um prompt de engenharia avançada ("Super Prompt").
 
-### Diferenciais
-- **Análise Semântica**: Compreensão profunda dos requisitos da vaga (Skills, Stack, Cultura).
-- **Adaptação Dinâmica**: Seleção inteligente de projetos e resumos profissionais.
-- **Interface Moderna**: UI desenvolvida em Streamlit com design system responsivo e Glassmorphism.
-- **Saída Otimizada**: Geração de arquivos `.docx` prontos para ATS (Applicant Tracking Systems).
-- **Alta Performance**: Banco SQLite com cache de decisões da IA (consultas 4x mais rápidas).
-- **Modelo Garantido**: Uso exclusivo do Gemini 2.5 Flash para máxima confiabilidade.
+## ✨ Funcionalidades V9.0 ("Super App")
 
-## 🚀 Tecnologias
+### 🧠 Engine de IA
+- **LangGraph State-Machine**: Arquitetura resiliente com auto-retry e validação em etapas.
+- **Super Prompt**: Prompt ultra-rígido focada em eliminar "alucinações" e linguagem corporativa clichê.
+- **Dual-Language Detection**: Detecta se a vaga é **EN-US** ou **PT-BR** (heurística + LLM fallback).
+- **Sanitização Automática**: Remove artefatos de markdown (`**bold**`, `*italic*`) que quebram formatação DOCX.
 
-- **Frontend**: [Streamlit](https://streamlit.io/) (Interface Web)
-- **Backend**: Python 3.10+
-- **Banco de Dados**: SQLite com [SQLAlchemy](https://www.sqlalchemy.org/) ORM
-- **IA/LLM**: [Google Gemini 2.5 Flash](https://ai.google.dev/) (via `langchain-google-genai`)
-- **Manipulação de Documentos**: `docxtpl` (Templating de arquivos Word)
-- **Gerenciamento de Ambiente**: `python-dotenv`
+### 🎨 Interface Premium ("Awwwards-level")
+- **Design System Custom**: CSS injetado com animações, glassmorphism e tipografia premium (Syne + DM Sans).
+- **Feedback Real-Time**: Status detalhado do processamento (loading states, steps).
+- **Preview Rico**: Visualização dos projetos selecionados e skills extraídas direto na UI.
+
+### 🛠️ Recursos Poderosos
+- **Modo Dev vs. Suporte**: Templates e narrativas distintas para vagas de Desenvolvimento vs. Suporte/ITSM.
+- **Cover Letter Generator**: Gera cartas de apresentação no modelo "Hook-Context-Proof-Fit" (validado para TI).
+- **Download Inteligente**: Baixe o currículo DOCX, a carta TXT ou um ZIP com ambos prontos para envio.
+
+---
+
+## 🚀 Como Usar
+
+### 1. Instalação
+
+```bash
+# Clone o repositório
+git clone https://github.com/alessandrolsdev/curriculo-automatizado.git
+cd curriculo-automatizado
+
+# Crie o ambiente virtual
+python -m venv .venv
+.\.venv\Scripts\activate  # Windows
+# source .venv/bin/activate # Linux/Mac
+
+# Instale dependências
+pip install -r requirements.txt
+```
+
+### 2. Configuração
+
+Crie um arquivo `.env` na raiz (use `.env.example` como base):
+
+```env
+GOOGLE_API_KEY=sua_chave_gemini_aqui
+```
+
+### 3. Rodando
+
+```bash
+streamlit run src/app.py
+```
+O app abrirá em `http://localhost:8501`.
+
+---
 
 ## 📂 Estrutura do Projeto
 
 ```
 curriculo-automatizado/
-├── data/
-│   ├── master_data.json.backup # Backup do JSON original
-│   └── curriculo.db             # Banco de dados SQLite
 ├── src/
-│   ├── app.py                   # Ponto de entrada da aplicação Streamlit
-│   ├── ai_recruiter.py          # Módulo Core de Lógica e Integração com IA
-│   ├── database.py              # Módulo de acesso ao banco SQLite
-│   └── main.py                  # Script Legacy (depreciado)
+│   ├── app.py           # Interface Streamlit (UI/UX)
+│   ├── ai_recruiter.py  # Engine V9 (LangGraph + Logic)
+│   ├── database.py      # Camada de Dados (SQLite + SQLAlchemy)
+│   └── translations.py  # Internacionalização e Config de Templates
+├── data/
+│   └── curriculo.db     # Seu banco de dados pessoal (não versionado)
 ├── templates/
-│   └── base_template.docx       # Template Jinja2 para o currículo
-├── output/                      # Diretório de saída dos currículos gerados
-├── logs/                        # Logs de migração e operações
-├── .env                         # Variáveis de ambiente (API Keys)
-└── requirements.txt             # Dependências do projeto
+│   ├── base_template.docx      # Template Dev PT
+│   ├── base_template_en.docx   # Template Dev EN
+│   ├── support_template.docx   # Template Suporte PT
+│   └── support_template_en.docx# Template Suporte EN
+├── output/              # Arquivos gerados (ignorados no git)
+└── requirements.txt     # Dependências
 ```
 
-## 🛠️ Instalação e Configuração
+## 🧠 Como Funciona (O "Flow")
 
-### 1. Pré-requisitos
-- Python instalado (recomendado 3.10 ou superior).
-- Chave de API do Google Gemini (`GOOGLE_API_KEY`).
-
-### 2. Clonar o Repositório
-```bash
-git clone https://github.com/alessandrolsdev/curriculo-automatizado.git
-cd curriculo-automatizado
-```
-
-### 3. Configurar Ambiente Virtual
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux/Mac
-source .venv/bin/activate
-```
-
-### 4. Instalar Dependências
-```bash
-pip install -r requirements.txt
-```
-
-### 5. Configurar Variáveis de Ambiente
-Crie um arquivo `.env` na raiz do projeto:
-```env
-GOOGLE_API_KEY=sua_chave_aqui
-```
-
-## ▶️ Como Usar
-
-### Interface Web (Recomendado)
-Para iniciar a interface interativa:
-
-```bash
-streamlit run src/app.py
-```
-O navegador abrirá automaticamente em `http://localhost:8501`. Cole a descrição da vaga desejada e clique em **Gerar Currículo**.
-
-> **Nota**: O sistema utiliza exclusivamente o modelo **Gemini 2.5 Flash** para máxima confiabilidade e performance.
-
-
-## 🔄 Migração para SQLite
-
-O projeto foi recentemente migrado de `master_data.json` para **SQLite** para maior escalabilidade e performance.
-
-### Benefícios da Migração
-- ⚡ Consultas **4x mais rápidas**
-- 💾 Cache inteligente de decisões da IA
-- 📈 Escalabilidade ilimitada
-- 🔒 Transações ACID garantidas
-- 🎯 Modelo Gemini 2.5 Flash garantido
-
-### Estrutura do Banco
-O banco SQLite (`curriculo.db`) contém 9 tabelas normalizadas:
-- `profiles` - Dados do perfil
-- `projects` - Portfólio de projetos  
-- `tech_stack` - Tecnologias por projeto
-- `summaries` - Resumos profissionais
-- E mais...
-
-## 📄 Licença
-
-Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+1. **Input**: Você cola a descrição da vaga (JD).
+2. **Análise**: O Engine detecta idioma e contexto (Dev ou Suporte).
+3. **Seleção**: Escolhe os 3 projetos mais relevantes do seu banco `curriculo.db`.
+4. **Rescrita**:
+   - Adapta descrições dos projetos para focar nas techs que a vaga pede.
+   - Escreve um Resumo Profissional único ("Hyper-Personalized").
+5. **Renderização**: Preenche o template DOCX via `docxtpl` preservando formatação.
 
 ---
-Desenvolvido com 💙 por Alessandro Lima.
+
+## 🛡️ Privacidade
+
+Este projeto foi desenhado para uso **pessoal**.
+- Seus dados ficam em `data/curriculo.db` (SQLite local).
+- O arquivo `.gitignore` garante que seu banco de dados e suas chaves de API nunca subam para o GitHub.
+
+---
+
+Desenvolvido por **Alessandro Lima**.
